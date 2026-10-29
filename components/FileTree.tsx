@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ancestorDirectories, ExplorerItem, RepositoryIndex, treeRows } from '@/lib/explorer';
+import { ancestorDirectories, parentDirectory, ExplorerItem, RepositoryIndex, treeRows } from '@/lib/explorer';
 import { palette } from '@/lib/model';
 const ROW = 30;
 const itemKey = (item: ExplorerItem) => item.kind + ':' + item.path;
@@ -13,30 +13,61 @@ export default function FileTree({ index, selected, revision, onSelect }: {
 }) {
     const selectionKey = itemKey(selected) + ':' + revision;
     const [expansion, setExpansion] = useState({ key: '', paths: new Set(['/']) });
-    const expanded = useMemo(() => expansion.key === selectionKey ? expansion.paths : new Set([...expansion.paths, ...ancestorDirectories(selected)]), [expansion, selectionKey, selected]);
+    const reveal = expansion.key !== selectionKey;
+    const ancestorPath = selected.kind === 'file' ? parentDirectory(selected.path) : selected.path;
+    const expanded = useMemo(() => {
+        if (!reveal)
+            return expansion.paths;
+        const ancestors = ancestorDirectories({ kind: 'directory', path: ancestorPath });
+        return ancestors.every(path => expansion.paths.has(path)) ? expansion.paths : new Set([...expansion.paths, ...ancestors]);
+    }, [expansion.paths, reveal, ancestorPath]);
     const rows = useMemo(() => treeRows(index, expanded), [index, expanded]);
     const [active, setActive] = useState({ selectionKey: '', item: itemKey(selected) });
     const activeKey = active.selectionKey === selectionKey ? active.item : itemKey(selected);
-    const activeIndex = Math.max(0, rows.findIndex(row => itemKey(row) === activeKey));
+    const positions = useMemo(() => new Map(rows.map((row, i) => [itemKey(row), i])), [rows]);
+    const activeIndex = positions.get(activeKey) ?? 0;
     const [scroll, setScroll] = useState(0), [height, setHeight] = useState(500);
     const viewport = useRef<HTMLDivElement>(null);
-    useEffect(() => { const element = viewport.current; if (!element)
-        return; const observer = new ResizeObserver(() => setHeight(element.clientHeight)); observer.observe(element); element.focus(); return () => observer.disconnect(); }, []);
-    useEffect(() => { const element = viewport.current; if (!element)
-        return; const i = rows.findIndex(row => itemKey(row) === itemKey(selected)); if (i < 0)
-        return; const top = i * ROW; if (top < element.scrollTop || top + ROW > element.scrollTop + element.clientHeight)
-        element.scrollTop = Math.max(0, top - element.clientHeight / 2); }, [rows, selected, revision]);
-    function focusRow(position: number) { const row = rows[Math.max(0, Math.min(rows.length - 1, position))]; setActive({ selectionKey, item: itemKey(row) }); const element = viewport.current; if (element) {
-        const top = rows.indexOf(row) * ROW;
-        if (top < element.scrollTop)
-            element.scrollTop = top;
-        else if (top + ROW > element.scrollTop + element.clientHeight)
-            element.scrollTop = top + ROW - element.clientHeight;
-    } }
-    function toggle(path: string) { const next = new Set(expanded); if (next.has(path))
-        next.delete(path);
-    else
-        next.add(path); setExpansion({ key: selectionKey, paths: next }); }
+    useEffect(() => {
+        const element = viewport.current;
+        if (!element)
+            return;
+        const observer = new ResizeObserver(() => setHeight(element.clientHeight));
+        observer.observe(element);
+        element.focus();
+        return () => observer.disconnect();
+    }, []);
+    useEffect(() => {
+        const element = viewport.current;
+        if (!element)
+            return;
+        const i = positions.get(itemKey(selected)) ?? -1;
+        if (i < 0)
+            return;
+        const top = i * ROW;
+        if (top < element.scrollTop || top + ROW > element.scrollTop + element.clientHeight)
+            element.scrollTop = Math.max(0, top - element.clientHeight / 2);
+    }, [positions, selected, revision]);
+    function focusRow(position: number) {
+        const row = rows[Math.max(0, Math.min(rows.length - 1, position))];
+        setActive({ selectionKey, item: itemKey(row) });
+        const element = viewport.current;
+        if (element) {
+            const top = (positions.get(itemKey(row)) ?? 0) * ROW;
+            if (top < element.scrollTop)
+                element.scrollTop = top;
+            else if (top + ROW > element.scrollTop + element.clientHeight)
+                element.scrollTop = top + ROW - element.clientHeight;
+        }
+    }
+    function toggle(path: string) {
+        const next = new Set(expanded);
+        if (next.has(path))
+            next.delete(path);
+        else
+            next.add(path);
+        setExpansion({ key: selectionKey, paths: next });
+    }
     const start = Math.max(0, Math.min(rows.length - 1, Math.floor(scroll / ROW) - 8)), end = Math.min(rows.length, start + Math.ceil(height / ROW) + 16);
     return <section className="tree-panel" aria-label="Repository files">
   <div className="panel-heading"><h2>Files</h2><button className="icon-button" aria-label="Collapse all folders" title="Collapse all folders" onClick={() => { setExpansion({ key: selectionKey, paths: new Set(['/']) }); focusRow(0); }}>⊟</button></div>

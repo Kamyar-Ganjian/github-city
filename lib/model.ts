@@ -60,5 +60,5 @@ export function normalize(tree: unknown): FileNode[] {
     }
     return files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 }
-export const height = (size: number) => Math.min(19, Math.max(.7, Math.log2(1 + Math.max(0, size) / 180) * 1.7));
+export const height = (size: number) => Math.min(12, Math.max(.85, Math.log2(1 + Math.max(0, size) / 256) * 1.25));
 export const fileUrl = (repo: Repository, file: FileNode) => 'https://github.com/' + repo.owner + '/' + repo.name + '/blob/' + repo.branch.split('/').map(encodeURIComponent).join('/') + '/' + file.path.split('/').map(encodeURIComponent).join('/');

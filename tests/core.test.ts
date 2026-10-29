@@ -35,7 +35,7 @@ describe('search and links', () => {
 });
 describe('GitHub pipeline', () => {
     const meta = { owner: { login: 'a' }, name: 'b', default_branch: 'develop', description: 'test', stargazers_count: 1 };
-    const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
+    const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value&&typeof value==='object'&&'tree' in value?{truncated:false,...value}:value), { status });
     it('uses actual default branch', async () => { const fetcher = vi.fn().mockResolvedValueOnce(reply(meta)).mockResolvedValueOnce(reply({ tree: [{ path: 'a.ts', size: 20, type: 'blob' }], truncated: false })); const repo = await loadRepository('a/b', fetcher); expect(repo.branch).toBe('develop'); expect(fetcher.mock.calls[1][0]).toContain('/develop?recursive=1'); });
     it.each([404, 403, 429, 409, 500])('handles HTTP %i', async (status) => { await expect(loadRepository('a/b', vi.fn().mockResolvedValue(reply({}, status)))).rejects.toThrow(); });
     it('rejects truncated trees', async () => { await expect(loadRepository('a/b', vi.fn().mockResolvedValueOnce(reply(meta)).mockResolvedValueOnce(reply({ tree: [], truncated: true })))).rejects.toThrow('incomplete'); });

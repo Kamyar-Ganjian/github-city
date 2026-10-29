@@ -41,3 +41,17 @@ describe('validation and GitHub failure boundaries', () => {
 describe('practical framing', () => {
     it('frames the visible aggregate rather than an empty underlying district', () => { const prepared = prepareRepository(normalize(Array.from({ length: 10000 }, (_, i) => ({ path: 'src/f' + i + '.ts', type: 'blob', size: i })))); const view = mapView(prepared, initialNavigation); expect(view.aggregates).toHaveLength(1); expect(view.bounds.width).toBeLessThanOrEqual(18); expect(view.maxHeight).toBeGreaterThan(1); });
 });
+describe('overview usefulness', () => {
+    it('ranks directory counts including nested entries with deterministic ties', () => {
+        const index = indexRepository(files);
+        expect(index.largestDirectories[0]).toBe('src');
+        expect(index.largestDirectories).not.toContain('/');
+        expect(index.largestDirectories).toEqual(indexRepository([...files].reverse()).largestDirectories);
+    });
+});
+describe('tree completeness', () => {
+    it('rejects a response with an unknown completeness flag', async () => {
+        const request = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ owner: { login: 'a' }, name: 'b', default_branch: 'main' }))).mockResolvedValueOnce(new Response(JSON.stringify({ tree: [{ path: 'a.ts', type: 'blob', size: 10 }] })));
+        await expect(loadRepository('a/b', request)).rejects.toMatchObject({ status: 502 });
+    });
+});

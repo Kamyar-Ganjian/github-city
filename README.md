@@ -1,185 +1,224 @@
 # GitHub City
 
-An interactive architectural atlas of public GitHub repositories. Files become windowed towers, directories become neighborhoods, and code becomes a place to explore.
+A practical explorer for public GitHub repositories. Browse a searchable file tree, inspect real file and directory metadata, and use a simple 3D architectural map to understand the project's structure.
 
-The redesign uses a mineral blue environment, warm limestone accents, compact exhibition controls, procedural window facades and landmark roofs. The city remains central; information appears through search, district navigation and a contextual inspector.
+The interface takes its visual direction from [nextjs.org](https://nextjs.org/): neutral surfaces, restrained borders, clear typography, and consistent spacing. Light, dark, and system themes are supported.
 
-## Delivery and verification status
+## Verification status
 
-Implemented and locally checked on October 29, 2026:
+Checked in the current environment on October 29, 2026:
 
-- TypeScript check: passed.
-- ESLint: passed without warnings.
-- Vitest: 44 tests passed, including mocked API integration and 25,000-file cases.
-- Production build: attempted with Turbopack and webpack; **blocked by the execution sandbox**. Turbopack cannot bind its internal socket (EPERM). Webpack cannot spawn TypeScript's configuration subprocess (spawnSync EPERM).
-- Playwright: attempted; preview server cannot bind 0.0.0.0:3000 (EPERM). Chromium installation also failed because cdn.playwright.dev cannot resolve.
-- Real GitHub smoke: unavailable; api.github.com cannot resolve.
-- Browser visual inspection, actual PNG export, camera feel, GPU FPS and deployment: **unverified**.
+| Check | Result |
+| --- | --- |
+| TypeScript strict checking | Passed |
+| ESLint | Passed without warnings |
+| Unit and mocked integration tests | 82 passed |
+| Production build | Blocked by sandbox subprocess restrictions |
+| Playwright | Blocked because the preview server cannot bind its port |
+| Live public GitHub smoke | Attempted for Hello World, React, and TypeScript; API hostname could not resolve |
+| Browser inspection, lighting appearance, and actual PNG download | Unverified |
+| Deployment | Not performed |
 
-This checkout is not a verified production release. There are no fabricated browser screenshots. Add an actual exported city image here after completing browser QA.
+Webpack's Next build reports that it cannot parse TypeScript's configuration output. A direct subprocess diagnostic returns `spawnSync /usr/bin/node EPERM` with empty output. Preview returns `listen EPERM 0.0.0.0:3000`. These checks must be rerun outside this execution sandbox before a release.
+
+Existing installed dependencies were used for verification. Manifest and lockfile dependency declarations match. An offline lockfile refresh could not finish because an optional Tailwind WASM package was absent from the local cache. A fresh installation requires registry access.
 
 ## Local setup
 
-Use Node.js 22+.
+Node.js 22 or newer is recommended.
 
 ```sh
 npm ci
-npx playwright install chromium
 npm run dev
 ```
 
-Visit http://localhost:3000. Enter a public HTTPS GitHub repository URL or owner/repository, or use an example. To open a repository directly:
+Open http://localhost:3000. Enter a public HTTPS GitHub URL or `owner/repository`. Examples use the real API pipeline.
 
-```text
-http://localhost:3000/?repo=facebook/react
-```
-
-Optionally copy .env.example to .env.local and supply GITHUB_TOKEN to increase API capacity. Tokens stay server-side. Private metadata is explicitly rejected even when a configured token could access it.
+Optional: copy `.env.example` to `.env.local` and set `GITHUB_TOKEN` for higher API limits. The token stays on the server; the application also works without it. Private repositories are excluded.
 
 ```sh
 npm run typecheck
 npm run lint
 npm test
 npm run build
-npm run test:e2e
-REAL_GITHUB_SMOKE=1 npm run test:e2e
-npm run benchmark
 npm start
+
+# Browser tests
+npx playwright install chromium
+npm run test:e2e
+
+# Optional network-dependent checks
+npm run smoke
+REAL_GITHUB_SMOKE=1 npm run test:e2e
+
+# Synthetic CPU measurements
+npm run benchmark
 ```
 
-The build script uses Next's webpack build path; both bundlers were attempted in the restricted environment. A successful unrestricted production build is still required before release.
+Share a repository with a URL such as:
 
-## Exploration
+```text
+http://localhost:3000/?repo=facebook/react
+```
 
-- Drag to orbit; scroll/pinch to zoom; right-drag or two-finger pan.
-- Click a file building to focus it and inspect its real metadata.
-- Click a district foundation or label to enter it. The navigator exposes all child directories.
-- Breadcrumbs provide parent navigation; Overview or H returns to the city.
-- Search by path or filename. Use arrows, Enter and Escape. Press / or Ctrl/Cmd+K to open search.
-- The inspector links to the actual default branch and encoded file path on GitHub.
-- Gold roofs identify README variants, package.json and Dockerfile using transparent filename rules.
-- Present hides the interface, offers a slow cinematic orbit, and downloads an actual rendered 1920×1080 PNG. The current composition is preserved with letterboxing where needed; aggregate views are identified in the PNG.
-- Share copies the current repository URL. It does not serialize the camera or file selection.
-- A paginated file browser remains usable when WebGL is unavailable or loses its context.
-- Reduced motion skips construction and animated focus and disables automatic orbit.
+Shared URLs open the repository; they do not serialize camera position or selection.
 
-## Scaling without a fixed file-count rejection
+## Workspace
 
-There is no 20,000-file gate.
+- **File tree:** expand folders, select files, and see descendant file counts. Rows are virtualized so large trees do not create a DOM element for every file.
+- **Search:** matches file and directory paths. Duplicate filenames remain distinct through their full paths. Use arrows and Enter; Escape closes results. Press / or Ctrl/Cmd+K to focus search.
+- **Inspector:** file name, path, extension/category, available size, language, parent directory, default branch, and GitHub link.
+- **Directory overview:** descendant file/directory counts, known byte sizes, depth, and language distribution by file count.
+- **Repository overview:** largest files, largest directories, deepest nesting, and common project filenames. Recognized filenames are conventions, not inferred architectural roles.
+- **Breadcrumbs:** navigate back to any ancestor.
+- **Mobile:** switch between Files, Map, and Details panels.
+- **Non-3D exploration:** hide the map, or continue using the tree and inspector when WebGL is unavailable. Context loss disables 3D while preserving repository data.
+
+Tree keyboard controls: Up/Down move focus, Right expands, Left collapses or moves to the parent, Home/End move to the first/last visible row, and Enter/Space select.
+
+## Reading and navigating the map
+
+Colored boxes represent individual files:
+
+- Height is `clamp(log2(1 + bytes / 256) × 1.25, 0.85, 12)`. Large files cannot grow beyond the cap; their actual size remains visible in the inspector.
+- Color is the extension-based language/category.
+- Position comes from deterministic directory packing. Directory views use local coordinates and compact aggregate spacing; Whole repository mode retains the full spatial synopsis.
+
+Gray boxes on square bases represent aggregates:
+
+- Height is `min(22, 2.5 + log2(1 + fileCount) × 1.1)`. Directory aggregate footprints are standardized to 7×7 units; whole-repository aggregate footprints are capped at 9×9. A single oversized module cannot create an unbounded block.
+- Hover shows the represented file count.
+- Directory aggregates open their actual directory.
+- Spatial aggregates in Whole repository mode may combine files across directories; their inspector identifies them as a subset and links to their deepest common directory.
+
+File categories have distinct, restrained silhouettes: stepped source towers, test buildings, compact configuration towers, thin documentation slabs, asset pavilions, and general boxes. Classification uses explicit filename, path, and extension rules; it does not analyze file contents. The inspector identifies each file's building style. Every geometry has the same normalized height envelope, so shape changes do not change the file-size encoding.
+
+Warm window lights use one shared 64×128 emissive texture with mipmaps. They are subtle in light mode and more visible in dark mode. Windows are decorative and do not represent activity, lines of code, or file counts. Geometry is instanced by category, with no individual window meshes or per-building light objects.
+
+Orbit by dragging, pan with right-drag, and zoom with the wheel or pinch. The visible **Pan** control makes left-drag pan instead. **Reset camera** fits the visible map. A folder click drills in and frames it; file clicks inspect and highlight without moving the camera. Tree and search selections focus the selected item.
+
+Focus transitions respect reduced-motion preferences. Manual camera input interrupts a transition. The map has no free-flight or cinematic modes.
+
+**Export PNG** captures the actual rendered WebGL map at 1920×1080 with letterboxing to preserve composition. The footer identifies the repository/scope, represented file count, and height encodings. HTML labels and the surrounding interface are not part of the WebGL capture. Browser export remains unverified in this environment.
+
+## Data definitions
+
+- **Files:** Git tree blob entries, including tracked symlinks and LFS pointer blobs.
+- **Directories:** derived from included file paths; the root is excluded from descendant-directory totals.
+- **Size:** sum of available GitHub blob sizes, not checkout/disk size or expanded LFS asset size.
+- **Unavailable sizes:** excluded from totals and largest-file ranking; the inspector explicitly says Unavailable. Their map buildings use minimum height.
+- **Directory depth:** number of directory segments below the repository root, whose depth is zero.
+- **Language distribution:** counts classified by filename extension, not source parsing or GitHub Linguist.
+- **Largest directories:** ranked independently by descendant file count. Entries can be nested, so those displayed counts should not be summed.
+
+No source file contents are fetched, and no code complexity, dependency relationships, or repository activity is inferred.
+
+## Scaling
+
+There is no 20,000-file rejection.
 
 ### Retrieval
 
-The server reads metadata and the actual default branch, then requests the recursive tree. If truncated, it discards that partial result and traverses individual trees from the returned immutable root SHA. Traversal uses batches of at most four requests and a per-load SHA promise cache, preserving distinct paths when directories share a tree object.
+The API retrieves metadata and the actual default branch, then requests a recursive Git tree. A truncated result is discarded and recovered through individual tree traversal from its immutable root SHA.
 
-Transient server errors get up to two short exponential retries. Rate limits stop traversal with an actionable message and reset time where GitHub provides it. Request cancellation propagates to GitHub. Individual requests have a 25-second timeout; the operation has a two-minute deadline and a 1,500-request budget. These are operational constraints, not file-count limits. A failure never returns a supposedly complete partial city.
+Traversal uses at most four concurrent requests and a per-load SHA cache. Repeated tree objects at different paths keep their distinct file paths. Successful responses have short HTTP cache headers. Retries are limited to transient server failures.
 
-An individually truncated nonrecursive directory cannot be recovered with this endpoint and produces an explicit error. Successful responses use short HTTP cache headers. Submodules are identified as external content and excluded with a visible disclosure; their referenced repositories are not traversed.
+Requests have a 25-second timeout; the full operation has a two-minute deadline and 1,500-request safety budget, including retries. Rate limits report useful messages and reset time where available. Cancellation reaches API requests and worker preparation.
 
-### Layout
+Malformed entries, unknown completeness flags, duplicate paths, and truncated individual trees are rejected rather than presented as complete. Submodule references are reported separately; their external contents are not traversed.
 
-The pure TypeScript engine constructs a path-indexed hierarchy and deterministic shelf packing. Direct files occupy grids; child rectangles reserve non-overlapping footprints. It uses a Map for directory lookup and avoids spreading arbitrarily large child arrays into function arguments. A module Web Worker performs planning away from the UI thread and is terminated on cancellation or replacement.
+### Index and layout
 
-The layout is reproducible for identical trees. It does not guarantee unchanged coordinates between revisions. Sorting and complete in-memory metadata remain necessary; memory is not unbounded.
+A pure directory index computes descendant totals once, bottom-up. Metadata lookup then uses Maps. The layout is a deterministic hierarchy of grids and packed district rectangles, with non-overlapping file footprints.
 
-### Progressive rendering
+The same tree and view settings produce the same positions. Directory views are recentered and aggregated overviews are compacted to support predictable navigation. Coordinates can change between view modes or revisions.
 
-Views containing more than 3,000 descendant files show child-directory architectural aggregates plus paginated blocks of up to 1,000 direct files. Entering a sufficiently small district reveals individual file buildings. Large flat directories can be explored block by block, and search goes directly to the relevant file block. No file is discarded from the loaded model.
+Preparation runs in a module Web Worker. Measurements below justify keeping this work away from the UI thread. The worker is terminated on cancellation or replacement.
 
-Aggregate foundations are explicitly labelled with represented file counts. Their height encodes logarithmic file count; individual file height uses the original bounded logarithmic byte scale. Never interpret an aggregate as one file building.
+### Bounded rendering
 
-At most 512 child-district foundations and 40 district labels appear in one scene. A visible message discloses the foundation limit; the paginated navigator exposes every child. The file browser and district navigator each mount at most 100 rows per page.
+Directory mode:
 
-Bodies, roof accents and district foundations use three instanced meshes; whole-city aggregate blocks add one instanced mesh. The construction sequence updates only the currently visible buildings and stops uploading matrices afterward. Selection uses a separate highlight instead of recoloring all buildings each frame. Window patterns use a material shader without extra per-window geometry. Picking is restricted to the active scene representation.
+- At most 2,000 descendant files are shown directly.
+- Larger scopes show child-directory aggregates and pages of up to 1,000 direct files.
+- Directories are paginated in groups of up to 500 when necessary.
+- The map states exactly how many files it currently represents. Paging does not remove data from the tree or search. Aggregated views use evenly spaced directory tiles, so an unusually large subtree cannot stretch its neighbors out of view.
 
-## Whole-city view
+Whole repository mode:
 
-Use **Whole city** beside **Districts** in the upper-left controls to see the complete repository footprint at once. District exploration remains available. Clicking a file, using search, or entering a district returns to detailed district navigation.
+- Up to 8,000 files appear individually.
+- Larger trees use a deterministic spatial grid with at most 8,000 visible items.
+- Singleton cells retain their real file buildings; multi-file cells become explicit aggregates.
+- Every loaded file contributes to exactly one visible item. No files are sampled away.
 
-Up to 8,000 files appear as individual buildings. Beyond that, a deterministic spatial grid produces at most 8,000 visible items: singleton cells retain their actual file buildings, while cells containing multiple files become clearly disclosed aggregate blocks. Every loaded file contributes exactly once. No sampling or pagination removes files from this view.
+Up to 200 district foundations and 16 labels provide context. Those visual-detail limits do not reduce file counts.
 
-Blocks preserve spatial location and show the dominant language by file count, with alphabetical tie-breaking. Block height uses the average file's byte size through the same bounded logarithmic scale as individual buildings. Hover shows the count and dominant language; click enters the deepest directory shared by the block's files. This may be the repository root for blocks spanning multiple directories. Search always provides direct access to individual files.
+File categories, aggregates, aggregate bases, and district foundations use instanced meshes. Instance matrices update when prepared views change, not every animation frame. The renderer uses demand rendering, a bounded device pixel ratio, and native mesh frustum culling. Camera transitions invalidate frames only while moving.
 
-Preparation runs in the existing Web Worker when the repository loads. The result is reused when switching views. Aggregate instance buffers initialize once, without per-frame updates. Screenshot export identifies whole-city mode and its aggregate block count. Existing retrieval deadlines and API rate limits still apply; there is no new repository file-count rejection. The item budget bounds rendering work, not total repository memory.
+The tree mounts only the visible rows plus overscan, with keyboard row lookup indexed independently of DOM size. The complete normalized metadata and worker copies still consume memory; support is not unlimited.
 
-Additional synthetic preparation measurements on the same machine (single run, excluding layout, worker transfer, browser and GPU):
-
-| Files represented | Individual buildings | Aggregate blocks | Whole-city preparation |
-| ---: | ---: | ---: | ---: |
-| 5,000 | 5,000 | 0 | 0.18 ms |
-| 25,000 | 69 | 4,820 | 28.98 ms |
-| 100,000 | 42 | 6,614 | 81.46 ms |
-
-Reproduce with `node node_modules/vite-node/vite-node.mjs scripts/benchmark-whole.ts`. These are CPU preparation timings, not navigation FPS guarantees. Visual and browser interaction checks remain blocked by the environment described above.
-
-## CPU measurements
+## Actual CPU measurements
 
 One synthetic run on Linux, Node v26.12.1, Intel Core i7-1165G7 @ 2.80 GHz:
 
-| Files | Directories including root | Layout | Overview preparation + ancestor counts | Search |
+| Files | Preparation | Root map | Path search | Flatten fully expanded tree |
 | ---: | ---: | ---: | ---: | ---: |
-| 5,000 | 202 | 7.11 ms | 3.44 ms | 0.61 ms |
-| 25,000 | 202 | 28.12 ms | 11.78 ms | 1.77 ms |
-| 100,000 | 202 | 104.95 ms | 71.41 ms | 7.35 ms |
+| 5,000 | 12.13 ms | 0.40 ms | 0.48 ms | 0.78 ms |
+| 25,000 | 67.72 ms | 0.07 ms | 1.77 ms | 1.52 ms |
+| 100,000 | 259.27 ms | 0.06 ms | 8.12 ms | 5.70 ms |
 
-Run npm run benchmark to reproduce. The dataset has 100 repeated nested directory groups and deterministic file sizes. These single-run CPU timings exclude fetching, normalization, worker structured cloning, browser rendering, picking and GPU work. They are not representative-repository FPS guarantees. Real repositories and mobile hardware still need profiling.
+Preparation includes indexing, layout, lookup maps, and the whole-repository synopsis. Input normalization happens before timing. The fixture contains a src directory with 100 child directories; its root map has one aggregate.
+
+These single-run CPU measurements exclude networking, worker structured cloning, React row-position indexing, DOM rendering, shader compilation, picking, and GPU work. They are not navigation FPS guarantees. Use `npm run benchmark` to reproduce and profile representative real repositories separately.
 
 ## Structure
 
 ```text
 app/
-  api/repository/route.ts   Server boundary, cache headers and cancellation
-  page.tsx                 Repository workflow and exhibition interface
-  globals.css              Responsive visual system
-  layout.tsx               Document metadata
+  api/repository/route.ts   Server API and cache/error boundary
+  page.tsx                 Workspace, repository input, and shared navigation
+  layout.tsx               Metadata and theme bootstrap
+  globals.css              Neutral design system and responsive panels
 components/
-  City.tsx                 Instanced architecture, shader, camera and PNG capture
-  CityBlocks.tsx           Static instanced whole-city aggregates
-  DistrictList.tsx         Paginated district navigation
-  FileBrowser.tsx          Paginated accessible file list
+  FileTree.tsx             Virtualized hierarchical keyboard explorer
+  Inspector.tsx            File, directory, and repository metadata
+  Search.tsx               Search and command-style keyboard access
+  MapPanel.tsx             Map controls, fallback, and paging
+  City.tsx                 Instancing, picking, camera, and PNG capture
+  building-geometry.ts      Shared silhouettes and window texture
+  ThemeToggle.tsx          Light/dark/system preferences
+hooks/
+  useRepository.ts         Cancellable loading and worker lifecycle
 lib/
-  github.ts                Bounded traversal, retries and GitHub errors
-  model.ts                 Classification, normalization, search and links
-  layout.ts                Pure deterministic hierarchy and packing
-  layout.worker.ts         Background layout and whole-city preparation
-  view.ts                  Progressive district representation and ancestor counts
-  whole-city.ts            Bounded spatial synopsis accounting for every file
-  store.ts                 Selection, district navigation and file blocks
-scripts/benchmark.ts        Reproducible synthetic CPU measurement
-tests/
-  core.test.ts             Existing parsing, classification and geometry coverage
-  scalability.test.ts      Large trees, traversal and progressive detail
-  e2e/city.spec.ts          Mocked journeys and optional live API smoke
+  github.ts                Validated GitHub retrieval and traversal
+  model.ts                 URL parsing, normalization, language detection
+  building-style.ts        Filename categories, footprints, and window pixels
+  explorer.ts              Directory index, search, statistics, tree rows
+  navigation.ts            Pure typed navigation reducer
+  layout.ts                Pure deterministic layout
+  whole-city.ts            Complete bounded spatial synopsis
+  map-view.ts              Directory and whole-map projection
+  prepare.ts               Shared preparation pipeline
+  layout.worker.ts         Worker entry point
+tests/                     Unit/integration and mocked Playwright coverage
+scripts/                   CPU benchmark and optional real API smoke
 ```
 
-## Architecture decisions
+A single reducer owns selection and navigation; the tree, inspector, and canvas receive the same state. The API does not fetch or lay out data inside rendering components. No external shared-state library is needed for this workspace.
 
-React owns interface state; Zustand coordinates district, selection, repeated focus requests and file blocks. Rendering consumes prepared data. API, normalization and layout remain independently testable.
+## Remaining verification and limitations
 
-Camera framing derives from district bounds, viewport aspect and field of view. Transitions use exponential, frame-rate-independent damping. Controls constrain polar angles and distance to avoid flips and below-ground orbiting. Manual control interrupts focus transitions. Cinematic orbit starts from the current composition and disables conflicting manual input while active.
-
-Instancing and progressive detail were chosen over a massive always-visible scene. Decorative window geometry is shader-only, and roofs remain attached accents rather than additional file markers. Aggregates are a different, explicitly described representation.
-
-A Web Worker was chosen instead of incremental React scheduling for layout. Full metadata is retained so search and the non-3D browser remain complete.
-
-## Remaining limitations and release checklist
-
-- Run production build and all Playwright journeys outside this sandbox; inspect desktop and mobile in a real browser.
-- Verify PNG pixels, procedural shader output, camera framing and context-loss recovery visually.
-- Profile real repositories and GPU behavior; no FPS measurement has been made.
-- The complete tree and worker copies consume memory. Extremely large trees can exceed browser memory; there is no promise of unlimited capacity.
-- Ancestor counting and view filtering run on the main thread; benchmark their worst-case directory shapes.
-- Search returns at most 60 matching paths. The directory file browser provides exhaustive access.
-- First 512 scene foundations and first 40 labels are intentionally bounded; the navigator is exhaustive.
-- No spatial picking acceleration, worker streaming, distance-driven LOD, free-flight mode or actual cast/contact shadows yet.
-- The cinematic feature is an orbit, not an automated multi-district tour.
-- Language detection is extension-based, not GitHub Linguist or content analysis.
-- API traversal is subject to GitHub limits and may require a server token for deeply fragmented trees.
-- No deployment or browser screenshot has been produced.
-
-Next improvements should focus on real-device visual QA, memory profiling, streaming worker results, cached spatial indexes, and context-aware label culling.
+- Production build, browser journeys, visual inspection, and real PNG pixels must be verified outside this sandbox.
+- No verified screenshots or deployment are included. Use Export PNG from a running application before adding a reference screenshot.
+- Real-repository smoke attempts were blocked by DNS, so current performance measurements use synthetic trees.
+- Search displays up to 60 results; folder navigation remains exhaustive.
+- Full metadata and worker cloning can exhaust memory for exceptionally large trees.
+- Individual tree truncation and GitHub rate/request/time budgets can prevent complete retrieval.
+- Language classification is deliberately extension-based.
+- Camera and accessibility behavior have unit coverage and authored browser tests, but need real-device validation.
 
 ## Contributing and license
 
-Keep data and layout independent of React. Include deterministic tests for algorithm changes, mocked GitHub responses for API behavior, and real browser captures for visual changes. Run all checks above before submitting.
+Run type checking, lint, unit tests, production build, and Playwright before submitting changes. Keep data/layout modules independent of React and Three.js. Mock GitHub for deterministic tests. Include actual browser captures for visual changes.
 
-No license has been selected without owner authorization. Before public open-source release, choose an appropriate license and include its full text.
+No license has been selected without owner authorization. Choose and add an appropriate license before publishing the project as open source.

@@ -69,3 +69,10 @@ test('large flat repositories remain searchable with bounded tree DOM and paging
 test('theme preferences persist', async ({ page }) => { await page.goto('/'); await page.getByRole('button', { name: /Color theme: system/ }).click(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'light'); await page.getByRole('button', { name: /Color theme: light/ }).click(); await page.reload(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark'); });
 test('mobile panels provide a complete non-3D explorer', async ({ page }) => { await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/?repo=example/architecture'); await expect(page.getByRole('tree')).toBeVisible(); await page.getByRole('combobox').fill('main.ts'); await page.getByRole('combobox').press('Enter'); await page.getByRole('button', { name: 'Details', exact: true }).click(); await expect(page.getByRole('heading', { name: 'main.ts', exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Map', exact: true }).click(); await expect(page.getByRole('button', { name: 'Reset camera' })).toBeVisible(); });
 test('optional live GitHub smoke', async ({ request }) => { test.skip(process.env.REAL_GITHUB_SMOKE !== '1', 'Opt in when public network access is available'); const response = await request.get('/api/repository?q=octocat/Hello-World'); expect(response.ok()).toBeTruthy(); expect((await response.json()).files.length).toBeGreaterThan(0); });
+test('the explorer remains usable when WebGL cannot initialize',async({page})=>{
+ await page.addInitScript("HTMLCanvasElement.prototype.getContext = new Proxy(HTMLCanvasElement.prototype.getContext, { apply(target, self, args) { return ['webgl','webgl2','experimental-webgl'].includes(args[0]) ? null : Reflect.apply(target, self, args); }});");
+ await page.goto('/?repo=example/architecture');
+ await expect(page.getByRole('heading',{name:'3D isn’t available in this browser.'})).toBeVisible();
+ await page.getByRole('combobox').fill('main.ts');await page.getByRole('combobox').press('Enter');
+ await expect(page.getByRole('heading',{name:'main.ts',exact:true})).toBeVisible();
+});

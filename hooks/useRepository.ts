@@ -21,24 +21,39 @@ export function useRepository() {
         setStatus('Reading repository metadata and file tree…');
         try {
             const response = await fetch('/api/repository?q=' + encodeURIComponent(input), { signal: controller.signal });
-            const repository = await response.json() as Repository & {
+            let repository: Repository & {
                 error?: string;
             };
+            try {
+                repository = await response.json();
+            }
+            catch {
+                throw new Error('The server returned an unreadable response. Please retry.');
+            }
             if (!response.ok)
                 throw new Error(repository.error ?? 'The repository could not be loaded.');
+            if (!repository || !Array.isArray(repository.files) || typeof repository.owner !== 'string' || typeof repository.name !== 'string')
+                throw new Error('The server returned incomplete repository data. Please retry.');
             controller.signal.throwIfAborted();
             setStatus('Indexing files and preparing the map…');
             const prepared = await new Promise<PreparedRepository>((resolve, reject) => {
                 const current = new Worker(new URL('../lib/layout.worker.ts', import.meta.url));
                 worker.current = current;
-                const cleanup = () => { current.terminate(); if (worker.current === current)
-                    worker.current = null; controller.signal.removeEventListener('abort', abort); };
+                const cleanup = () => {
+                    current.terminate();
+                    if (worker.current === current)
+                        worker.current = null;
+                    controller.signal.removeEventListener('abort', abort);
+                };
                 const abort = () => { cleanup(); reject(new DOMException('Cancelled', 'AbortError')); };
                 controller.signal.addEventListener('abort', abort, { once: true });
-                current.onmessage = event => { cleanup(); if (event.data.error)
-                    reject(new Error(event.data.error));
-                else
-                    resolve(event.data.prepared); };
+                current.onmessage = event => {
+                    cleanup();
+                    if (event.data.error)
+                        reject(new Error(event.data.error));
+                    else
+                        resolve(event.data.prepared);
+                };
                 current.onerror = () => { cleanup(); reject(new Error('Your browser could not prepare this repository. Try a smaller repository or another browser.')); };
                 current.postMessage(repository.files);
             });
@@ -59,8 +74,10 @@ export function useRepository() {
     }, []);
     useEffect(() => {
         const input = new URLSearchParams(window.location.search).get('repo');
-        const timer = setTimeout(() => { if (input)
-            void load(input); }, 0);
+        const timer = setTimeout(() => {
+            if (input)
+                void load(input);
+        }, 0);
         return () => { clearTimeout(timer); active.current?.abort(); worker.current?.terminate(); };
     }, [load]);
     return { loaded, status, error, load, cancel, dismissError: () => setError('') };

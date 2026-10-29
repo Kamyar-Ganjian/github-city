@@ -569,7 +569,7 @@ input::placeholder {
   gap: 6px;
   padding-right: 12px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   user-select: none;
   white-space: nowrap;
 }
@@ -682,6 +682,7 @@ input::placeholder {
   position: relative;
   flex: 1;
   min-height: 200px;
+  overflow: hidden;
 }
 .map-canvas>div {
   height: 100%;
@@ -1294,7 +1295,3 @@ dd {
     scroll-behavior: auto!important;
   }
 }
-.map-canvas {
-  overflow: hidden;
-}
-

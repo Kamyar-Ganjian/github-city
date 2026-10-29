@@ -78,7 +78,7 @@ export function wholeCity(city: City, budget = WHOLE_CITY_BUDGET): WholeCity {
             continue;
         }
         const language = [...cell.languages].sort(([a, ac], [b, bc]) => bc - ac || (a < b ? -1 : a > b ? 1 : 0))[0][0];
-        blocks.push({ id: String(id), x: (cell.minX + cell.maxX) / 2, z: (cell.minZ + cell.maxZ) / 2, width: cell.maxX - cell.minX + 1.55, depth: cell.maxZ - cell.minZ + 1.55, height: aggregateHeight(cell.count), count: cell.count, bytes: cell.bytes, language, directory: cell.directory });
+        blocks.push({ id: String(id), x: (cell.minX + cell.maxX) / 2, z: (cell.minZ + cell.maxZ) / 2, width: Math.min(9,cell.maxX - cell.minX + 1.55), depth: Math.min(9,cell.maxZ - cell.minZ + 1.55), height: aggregateHeight(cell.count), count: cell.count, bytes: cell.bytes, language, directory: cell.directory });
     }
     return { buildings, blocks, fileCount: city.buildings.length };
 }

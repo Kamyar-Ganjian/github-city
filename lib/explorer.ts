@@ -5,7 +5,7 @@ export const DETAIL_LIMIT = 2000;
 export const comparePaths = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 export const parentDirectory = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '/';
 export const isWithin = (path: string, directory: string) => directory === '/' || path === directory || path.startsWith(directory + '/');
-export const aggregateHeight = (count: number) => Math.min(28, 2 + Math.log2(1 + Math.max(0, count)) * 2);
+export const aggregateHeight = (count: number) => Math.min(22, 2.5 + Math.log2(1 + Math.max(0, count)) * 1.1);
 export interface DirectoryInfo {
     path: string;
     name: string;
@@ -23,6 +23,7 @@ export interface RepositoryIndex {
     files: Map<string, FileNode>;
     directories: Map<string, DirectoryInfo>;
     largestFiles: string[];
+    largestDirectories: string[];
     notableFiles: string[];
     maxDepth: number;
 }
@@ -85,7 +86,16 @@ export function indexRepository(files: FileNode[]): RepositoryIndex {
                 parent.languages[language] = (parent.languages[language] ?? 0) + count;
         }
     }
-    return { files: byPath, directories, largestFiles, notableFiles, maxDepth: ordered[0]?.depth ?? 0 };
+    const largestDirectories: string[] = [];
+    for (const directory of directories.values()) {
+        if (directory.path === '/')
+            continue;
+        largestDirectories.push(directory.path);
+        largestDirectories.sort((a, b) => directories.get(b)!.fileCount - directories.get(a)!.fileCount || comparePaths(a, b));
+        if (largestDirectories.length > 8)
+            largestDirectories.pop();
+    }
+    return { files: byPath, directories, largestFiles, largestDirectories, notableFiles, maxDepth: ordered[0]?.depth ?? 0 };
 }
 export function searchRepository(index: RepositoryIndex, query: string, limit = 60): ExplorerItem[] {
     const q = query.trim().toLowerCase();
@@ -139,8 +149,8 @@ export function formatBytes(size: number) {
     if (size < 1024)
         return size.toLocaleString() + ' B';
     if (size < 1024 ** 2)
-        return (size / 1024).toFixed(1) + ' KB';
+        return (size / 1024).toFixed(1) + ' KiB';
     if (size < 1024 ** 3)
-        return (size / 1024 ** 2).toFixed(1) + ' MB';
-    return (size / 1024 ** 3).toFixed(2) + ' GB';
+        return (size / 1024 ** 2).toFixed(1) + ' MiB';
+    return (size / 1024 ** 3).toFixed(2) + ' GiB';
 }

@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "benchmark": "vite-node scripts/benchmark.ts"
+    "benchmark": "vite-node scripts/benchmark.ts",
+    "smoke": "vite-node scripts/smoke.ts"
   },
   "dependencies": {
     "next": "^16.0.0",

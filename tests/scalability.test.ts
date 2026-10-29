@@ -6,7 +6,7 @@ import { prepareRepository } from '../lib/prepare';
 import { mapView } from '../lib/map-view';
 import { initialNavigation, navigate } from '../lib/navigation';
 const meta = { owner: { login: 'a' }, name: 'b', default_branch: 'main', stargazers_count: 0 };
-const reply = (value: unknown) => new Response(JSON.stringify(value));
+const reply = (value: unknown) => new Response(JSON.stringify(value&&typeof value==='object'&&'tree' in value?{truncated:false,...value}:value));
 describe('large tree retrieval', () => {
     it('recovers truncated trees, deduplicates SHA requests and preserves both paths', async () => {
         const fetcher = vi.fn(async (url: string | URL | Request) => { const path = String(url); if (path.endsWith('/a/b'))

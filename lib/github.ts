@@ -27,7 +27,7 @@ export async function loadRepository(input: string, request: typeof fetch = fetc
             if (combined.aborted)
                 throw new GitHubError('Repository retrieval was cancelled or timed out.', 408);
             if (++requests > 1500)
-                throw new GitHubError('Tree traversal reached its 1,500-request budget. No partial repository was returned. Retry with a server token or a smaller tree.', 422);
+                throw new GitHubError('Tree traversal reached its 1,500-request budget. No partial repository was returned. Try a smaller repository.', 422);
             let response: Response;
             try {
                 response = await request('https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(name) + path, { headers, signal: AbortSignal.any([combined, AbortSignal.timeout(25000)]) });
@@ -76,20 +76,26 @@ export async function loadRepository(input: string, request: typeof fetch = fetc
         if (metadata.private)
             throw new GitHubError('Only public repositories can be explored.', 404);
         const initial = await get<Tree>('/git/trees/' + encodeURIComponent(metadata.default_branch) + '?recursive=1');
-        const valid = (tree: Tree) => { if (!tree || !Array.isArray(tree.tree) || tree.tree.some(entry => !entry || typeof entry.path !== 'string' || !['blob', 'tree', 'commit'].includes(entry.type) || (entry.type === 'tree' && (typeof entry.sha !== 'string' || !entry.sha))))
-            throw new GitHubError('GitHub returned an incomplete or malformed tree.', 502); };
+        const valid = (tree: Tree) => {
+            if (!tree || !Array.isArray(tree.tree) || typeof tree.truncated !== 'boolean' || tree.tree.some(entry => !entry || typeof entry.path !== 'string' || !['blob', 'tree', 'commit'].includes(entry.type) || (entry.type === 'tree' && (typeof entry.sha !== 'string' || !entry.sha))))
+                throw new GitHubError('GitHub returned an incomplete or malformed tree.', 502);
+        };
         valid(initial);
         let entries: Entry[] = initial.tree;
         if (initial.truncated) {
-            if (!initial.sha)
+            if (typeof initial.sha !== 'string' || !initial.sha)
                 throw new GitHubError('GitHub returned an incomplete tree without a root identifier.', 502);
             entries = [];
             const queue = [{ sha: initial.sha, prefix: '' }];
             const cache = new Map<string, Promise<Tree>>();
-            const fetchTree = (sha: string) => { let promise = cache.get(sha); if (!promise) {
-                promise = get<Tree>('/git/trees/' + encodeURIComponent(sha));
-                cache.set(sha, promise);
-            } return promise; };
+            const fetchTree = (sha: string) => {
+                let promise = cache.get(sha);
+                if (!promise) {
+                    promise = get<Tree>('/git/trees/' + encodeURIComponent(sha));
+                    cache.set(sha, promise);
+                }
+                return promise;
+            };
             let cursor = 0;
             while (cursor < queue.length) {
                 const batch = queue.slice(cursor, cursor + 4);

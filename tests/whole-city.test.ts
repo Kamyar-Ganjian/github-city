@@ -18,3 +18,13 @@ describe('whole city', () => {
     } });
     it('returns from whole city to file detail through navigation', () => { const whole = navigate(initialNavigation, { type: 'whole' }); expect(whole.mode).toBe('whole'); const file = makeCity(1).buildings[0].file; const detail = navigate(whole, { type: 'file', path: file.path, directory: file.directory, page: 0, focus: true }); expect(detail.mode).toBe('directory'); expect(detail.focus.path).toBe(file.path); });
 });
+describe('aggregate picking footprints',()=>{
+ it('does not overlap visible summary footprints in a representative nested layout',()=>{
+  const city=makeCity(10000),result=wholeCity(city,200);
+  const markers=[...result.blocks,...result.buildings.map(b=>({x:b.x,z:b.z,width:1.55,depth:1.55}))];
+  for(let i=0;i<markers.length;i++)for(let j=i+1;j<markers.length;j++){
+   const a=markers[i],b=markers[j];
+   expect(Math.abs(a.x-b.x)+1e-7>=(a.width+b.width)/2||Math.abs(a.z-b.z)+1e-7>=(a.depth+b.depth)/2).toBe(true);
+  }
+ });
+});
