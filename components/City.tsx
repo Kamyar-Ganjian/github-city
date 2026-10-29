@@ -1,6 +1,7 @@
 'use client';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
-import { Html, OrbitControls } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
+import CityLabel from './CityLabel';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls as Controls } from 'three-stdlib';
@@ -97,7 +98,7 @@ function Batch({ items, onPick, dark, near, kind, variant, selectedId }: {
  </instancedMesh>
  <instancedMesh ref={roof} args={[undefined, undefined, items.length]} castShadow={near} receiveShadow onClick={event => pick(event)} onPointerMove={event => track(event)} onPointerOut={() => setHover(null)}><primitive object={parts.details} attach="geometry"/><meshStandardMaterial vertexColors color="#a9b1b5" roughness={.75} metalness={.18}/></instancedMesh>
  {bases.length > 0 && <instancedMesh ref={base} args={[undefined, undefined, bases.length]} onClick={event => pick(event, bases)} onPointerMove={event => track(event, bases)} onPointerOut={() => setHover(null)}><boxGeometry /><meshStandardMaterial color={dark ? '#bbc4c8' : '#48535c'} roughness={1}/></instancedMesh>}
- {item && <Html center position={[item.x, item.height + 1.5, item.z]} style={{ pointerEvents: 'none' }}><div className="map-tooltip"><strong>{buildingNames[item.kind]}{item.aggregate ? ' · Aggregate' : ''} · </strong>{item.label}</div></Html>}
+ {item && <CityLabel position={[item.x, item.height + 1.5, item.z]} text={`${buildingNames[item.kind]}${item.aggregate ? ' · Aggregate' : ''} · ${item.label}`}/>}
  </>;
 }
 function SelectionOutline({ item, dark }: {
@@ -107,7 +108,7 @@ function SelectionOutline({ item, dark }: {
     const geometry = useMemo(() => { const solid = buildingGeometry(item.kind, item.variant), edges = new THREE.EdgesGeometry(solid, 25); solid.dispose(); return edges; }, [item.kind, item.variant]);
     useEffect(() => () => geometry.dispose(), [geometry]);
     const factor = item.aggregate ? .65 : 1;
-    return <><lineSegments geometry={geometry} position={[item.x, item.height / 2 + (item.aggregate ? .2 : .12), item.z]} scale={[item.width * factor, item.height, item.depth * factor]} renderOrder={100} raycast={() => { }}><lineBasicMaterial color={dark ? '#f5f0df' : '#172933'} depthTest={false} transparent opacity={.9}/></lineSegments><Html center position={[item.x, item.height + 1.5, item.z]} zIndexRange={[30, 20]} style={{ pointerEvents: 'none' }}><div className="map-tooltip">{item.label}</div></Html></>;
+    return <><lineSegments geometry={geometry} position={[item.x, item.height / 2 + (item.aggregate ? .2 : .12), item.z]} scale={[item.width * factor, item.height, item.depth * factor]} renderOrder={100} raycast={() => { }}><lineBasicMaterial color={dark ? '#f5f0df' : '#172933'} depthTest={false} transparent opacity={.9}/></lineSegments><CityLabel position={[item.x, item.height + 1.5, item.z]} text={item.label}/></>;
 }
 function FileFoundations({ items, dark }: {
     items: Marker[];
@@ -265,7 +266,7 @@ function World(props: Props) {
  {batches.map(batch => <Batch key={batch.kind + batch.variant} items={batch.items} kind={batch.kind} variant={batch.variant} dark={dark} near={near && !low} selectedId={highlight?.id} onPick={pick}/>)}
 
  {highlight && <SelectionOutline item={highlight} dark={dark}/>}
- {labels && view.boundaries.slice(0, 16).map(d => <Html key={d.path} center position={[d.x, .2, d.z + d.depth / 2 - 1]} distanceFactor={Math.max(40, Math.min(d.width, d.depth) * 1.8)} zIndexRange={[2, 0]}><button className="map-label" onClick={() => onSelect({ kind: 'directory', path: d.path }, true)}>{d.path}</button></Html>)}
+ {labels && view.boundaries.slice(0, 16).map(d => <CityLabel key={d.path} position={[d.x, .2, d.z + d.depth / 2 - 1]} distanceFactor={Math.max(40, Math.min(d.width, d.depth) * 1.8)} text={d.path} onClick={() => onSelect({ kind: 'directory', path: d.path }, true)}/>)}
  <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.12} rotateSpeed={.6} panSpeed={.8} zoomSpeed={.85} minDistance={4} maxDistance={span * 20} minPolarAngle={.1} maxPolarAngle={Math.PI / 2.15} screenSpacePanning={false} mouseButtons={{ LEFT: pan ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }} onStart={() => { moving.current = false; }}/>
  </>;
 }

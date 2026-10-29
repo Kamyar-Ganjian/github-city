@@ -91,3 +91,26 @@ test('environment settings preserve repository counts and selection', async ({ p
     await page.getByRole('combobox').press('Enter');
     await expect(page.getByRole('heading', { name: 'main.ts', exact: true })).toBeVisible();
 });
+test('map annotations survive label toggles, navigation, and canvas unmounts', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/?repo=example/architecture');
+    await expect(page.locator('.map-label').first()).toBeVisible();
+    for (let i = 0; i < 3; i++) {
+        await page.getByRole('button', { name: 'Labels', exact: true }).click();
+        await expect(page.locator('.map-label')).toHaveCount(0);
+        await page.getByRole('button', { name: 'Labels', exact: true }).click();
+        await expect(page.locator('.map-label').first()).toBeVisible();
+    }
+    await page.locator('button.map-label').filter({ hasText: /^src$/ }).click();
+    await expect(page.getByRole('navigation', { name: 'Repository path' })).toContainText('src');
+    await page.getByRole('combobox').fill('main.ts');
+    await page.getByRole('combobox').press('Enter');
+    await expect(page.locator('.map-tooltip')).toContainText('src/main.ts');
+    await page.getByRole('button', { name: 'Hide 3D' }).click();
+    await expect(page.locator('.map-label, .map-tooltip')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show 3D' }).click();
+    await expect(page.locator('.map-tooltip')).toContainText('src/main.ts');
+    expect(errors.filter(message => /synchronously unmount|already rendering|race condition/i.test(message))).toEqual([]);
+});
