@@ -6,17 +6,17 @@ The interface takes its visual direction from [nextjs.org](https://nextjs.org/):
 
 ## Verification status
 
-Checked in the current environment on October 29, 2026:
+Checked in the current environment on October 30, 2026:
 
 | Check | Result |
 | --- | --- |
 | TypeScript strict checking | Passed |
 | ESLint | Passed without warnings |
-| Unit and mocked integration tests | 93 passed (single worker) |
+| Unit and mocked integration tests | 100 passed (single worker) |
 | Production build | Blocked by sandbox subprocess restrictions |
 | Playwright | Blocked because the preview server cannot bind its port |
 | Live public GitHub smoke | Attempted for Hello World, React, and TypeScript; API hostname could not resolve |
-| Browser inspection, lighting appearance, and actual PNG download | Unverified; top-down landscape diagnostics inspected for 120, 5,000 and 100,000 synthetic files |
+| Browser inspection, lighting appearance, and actual PNG download | Unverified; model-geometry and top-down layout diagnostics inspected. Headless Firefox crashes at startup. |
 | Deployment | Not performed |
 
 Webpack's Next build reports that it cannot parse TypeScript's configuration output. A direct subprocess diagnostic returns `spawnSync /usr/bin/node EPERM` with empty output. Preview returns `listen EPERM 0.0.0.0:3000`. These checks must be rerun outside this execution sandbox before a release.
@@ -102,12 +102,20 @@ City density uses a continuous logarithmic file-count factor rather than a list 
 **Environment: Minimal / Detailed** changes only environmental rendering:
 
 - **Minimal:** repository architecture, district foundations, labels, and navigation.
-- **Detailed:** road surfaces, sidewalks, markings/crosswalks, parks, plazas, trees, lamps, benches, sparse background service buildings, and a repository city sign.
-- **Background buildings:** the separate checkbox hides all decorative buildings while retaining other scenery.
+- **Detailed:** road surfaces, sidewalks, markings/crosswalks, parks, plazas, trees, lamps, benches, parked vehicles, public transit facilities, water features, sparse background service buildings, and a repository city sign.
+- **Background buildings:** the separate checkbox hides neutral background service structures while retaining transit and other scenery. Minimal mode hides the entire decorative environment.
 
 Decorative structures use muted neutral materials, have no data labels or window lights, and cannot intercept raycasting. Environment placement is checked against repository footprints. Decorations near a selected building are suppressed, the sign hides during inspection, and selection outlines render clearly above scenery.
 
-Environmental detail is bounded: at most 128 neighborhoods receive full internal street detail, with an avenue backbone for all neighborhoods. The landscape pass examines at most 192 × 192 ground cells, protects foundations, aggregate podiums, roads and sidewalks, then merges free cells into non-overlapping lawns. Broad parks receive longitudinal walking paths and area-weighted seeded groves; narrow strips receive low planting. Tree size and cluster spread adapt to the available park width. Budgets are 3,072 lawn patches, 128 paths, 512 trees, 768 shrubs, 96 lamps, 48 benches, and 24 background structures. Available free space can produce fewer objects, including no background structures. Very narrow or sub-cell spaces remain unplanted to preserve clearance. This does not omit repository data.
+Environmental detail is bounded: at most 128 neighborhoods receive full internal street detail, with an avenue backbone for all neighborhoods. The landscape pass examines at most 192 × 192 ground cells, protects foundations, aggregate podiums, roads and sidewalks, then merges free cells into non-overlapping lawns. Broad parks receive longitudinal walking paths and area-weighted seeded groves; narrow strips receive low planting. Tree size and cluster spread adapt to the available park width. Budgets are 3,072 lawn patches, 128 paths, 512 trees, 768 shrubs, 96 lamps, 48 park benches (plus up to four waterside benches), and 24 background structures. Available free space can produce fewer objects, including no background structures. Very narrow or sub-cell spaces remain unplanted to preserve clearance. This does not omit repository data.
+
+### Transportation and water
+
+All transportation is static municipal scenery, not repository activity. Eight shared procedural vehicle families cover sedans, SUVs, hatchbacks, pickups, delivery vans, cargo trucks, buses and occasional taxis. Sloped cabins, glazed facades, wheels, bumpers, lights and pickup beds are merged into instanced painted-body and trim batches. Wheel geometry compensates for instance proportions to stay circular. Cars occupy marked parallel curb bays on wider streets, leaving narrow lanes, crossings, junctions and station approaches clear. The cap is 320 vehicles, with a smaller count-based budget for towns.
+
+Facilities are placed on collision-checked roadside land and linked to existing sidewalks by paved access strips. Shelters include seating and bus pictograms. Repository views with at least 2,500 represented files may receive terminals; 4,000 may receive subway entrance pavilions with steps, railings and M signs; 8,000 may receive a rail station when a long, clear plot exists. Budgets are 16 stops, 2 terminals, 6 subway entrances and 1 rail station. These thresholds permit facilities rather than guaranteeing them. A station has a straight reserved rail alignment, sleepers, buffer stops, a passenger platform and three coupled static carriages. There is no simulated citywide train network or underground navigation.
+
+Up to four ponds/lakes occupy the banks of broad parks without crossing existing paths. Seeded shoreline templates provide organic banks and walking loops; waterside benches are reserved before planting. Up to six fountains occupy public squares, including a few paved pocket squares reclaimed from suitable street-side lawns. Water uses restrained physical materials and direct-light highlights, with no live reflection pass or continuous animation. Facility, water and access footprints are reserved before trees, shrubs and other props are placed. These objects are unpickable and excluded from every repository statistic. Vehicles and transit details disappear at distant/low-quality views; flat water and shorelines remain.
 
 ### Navigation and presentation
 
@@ -181,11 +189,11 @@ One synthetic whole-repository run on Linux, Node v26.12.1, Intel Core i7-1165G7
 
 | Files represented | Preparation | Urban layout | Environment placement | Repository units | Roads | Trees | Background structures |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 5,000 | 13.36 ms | 6.97 ms | 48.48 ms | 5,000 | 614 | 308 | 0 |
-| 25,000 | 102.26 ms | 3.61 ms | 43.73 ms | 2,906 | 614 | 395 | 24 |
-| 100,000 | 356.52 ms | 2.43 ms | 39.04 ms | 1,410 | 425 | 354 | 24 |
+| 5,000 | 10.33 ms | 6.58 ms | 50.69 ms | 5,000 | 614 | 306 | 0 |
+| 25,000 | 59.90 ms | 3.00 ms | 50.54 ms | 2,906 | 614 | 392 | 24 |
+| 100,000 | 244.23 ms | 2.07 ms | 45.92 ms | 1,410 | 425 | 347 | 24 |
 
-The landscape pass produced 505, 351, and 149 lawn patches respectively, with 157, 137, and 134 shrubs. These CPU measurements include the new land-use and planting pass; they are not GPU frame-rate measurements.
+The landscape pass produced 505, 351, and 149 lawn patches respectively, with 156, 137, and 134 shrubs. Vehicle counts were 222/320/320, transit facilities 7/17/25, and water features 3/10/10. These CPU measurements include land use, planting, transportation and water placement; they are not GPU frame-rate measurements.
 
 The 100,000-file fixture produces 1,247 high-rise and 163 mid-rise representations, accounting for all 100,000 files exactly once. The fixture uses a src directory with 100 child directories and progressively increasing file sizes. This is synthetic data, not a benchmark of React or TypeScript repositories.
 
@@ -213,6 +221,8 @@ components/
   City.tsx                 Instancing, picking, camera, and PNG capture
   building-geometry.ts      Modular scale-based architecture and facade atlases
   Environment.tsx          Batched scenery and physical city sign
+  Amenities.tsx            Instanced vehicles, transit and water
+  amenity-geometry.ts      Shared procedural transportation and shoreline models
   ThemeToggle.tsx          Light/dark/system preferences
 hooks/
   useRepository.ts         Cancellable loading and worker lifecycle
@@ -222,6 +232,7 @@ lib/
   building-style.ts        Height-based archetypes, seeded variants, facade pixels
   urban-layout.ts          District lots, blocks, roads, and reserved spaces
   environment.ts           Collision-checked groves, gardens and secondary objects
+  amenities.ts             Curb parking, transit sites, water and access reservation
   landscape.ts             Bounded vacant-land raster, coalescing and clearance index
   explorer.ts              Directory index, search, statistics, tree rows
   navigation.ts            Pure typed navigation reducer

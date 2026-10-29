@@ -20,5 +20,5 @@ for (const count of [5000, 25000, 100000]) {
         const k = architectureKind(a.height, true);
         scale[k] = (scale[k] ?? 0) + 1;
     }
-    console.log(JSON.stringify({ files: count, prepareMs: +(preparedAt - start).toFixed(2), urbanMs: +(plannedAt - preparedAt).toFixed(2), environmentMs: +(environmentAt - plannedAt).toFixed(2), represented: view.representedFiles, units: view.buildings.length + view.aggregates.length, roads: view.urban.roads.length, lawns: environment.parks.length, paths: environment.paths.length, trees: environment.trees.length, shrubs: environment.shrubs.length, background: environment.background.length, scale }));
+    console.log(JSON.stringify({ files: count, prepareMs: +(preparedAt - start).toFixed(2), urbanMs: +(plannedAt - preparedAt).toFixed(2), environmentMs: +(environmentAt - plannedAt).toFixed(2), represented: view.representedFiles, units: view.buildings.length + view.aggregates.length, roads: view.urban.roads.length, lawns: environment.parks.length, paths: environment.paths.length, trees: environment.trees.length, shrubs: environment.shrubs.length, background: environment.background.length, vehicles: environment.vehicles.length, facilities: environment.facilities.length, water: environment.water.length, scale }));
 }

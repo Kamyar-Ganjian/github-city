@@ -1,6 +1,7 @@
 import { seed } from './building-style';
 import { UrbanPlan } from './urban-layout';
 import { groundOccupancy, landscapeLots, overlaps } from './landscape';
+import { amenitiesPlan, footprint, type Amenities } from './amenities';
 export interface Prop {
     id: string;
     x: number;
@@ -10,7 +11,7 @@ export interface Prop {
     height: number;
     rotation?: number;
 }
-export interface EnvironmentPlan {
+export interface EnvironmentPlan extends Amenities {
     parks: Prop[];
     plazas: Prop[];
     paths: Prop[];
@@ -21,7 +22,7 @@ export interface EnvironmentPlan {
     background: Prop[];
 }
 export function environmentPlan(plan: UrbanPlan): EnvironmentPlan {
-    const result: EnvironmentPlan = { parks: [], plazas: [], paths: [], shrubs: [], trees: [], lamps: [], benches: [], background: [] };
+    const result: EnvironmentPlan = { parks: [], plazas: [], paths: [], shrubs: [], trees: [], lamps: [], benches: [], background: [], vehicles: [], facilities: [], water: [], waterfrontBenches: [], squares: [], accessPaths: [] };
     const ground = groundOccupancy(plan), planting = groundOccupancy(plan);
     const plots = [...plan.plots].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     for (const plot of plots) {
@@ -39,6 +40,11 @@ export function environmentPlan(plan: UrbanPlan): EnvironmentPlan {
         const path = { ...park, id: park.id + ':walk', width: vertical ? .55 : park.width, depth: vertical ? park.depth : .55, height: .065 };
         result.paths.push(path);
         planting.add({ ...path, width: path.width + .25, depth: path.depth + .25 });
+    }
+    Object.assign(result, amenitiesPlan(plan, result));
+    for (const prop of [...result.facilities, ...result.water, ...result.waterfrontBenches, ...result.squares, ...result.accessPaths]) {
+        const box = footprint(prop);
+        planting.add({ ...box, width: box.width + .4, depth: box.depth + .4 });
     }
     const place = (target: Prop[], prop: Prop) => {
         if (!planting.clear(prop)) return false;
