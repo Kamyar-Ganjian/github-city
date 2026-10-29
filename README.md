@@ -10,7 +10,7 @@ Implemented and locally checked on October 29, 2026:
 
 - TypeScript check: passed.
 - ESLint: passed without warnings.
-- Vitest: 36 tests passed, including mocked API integration and 25,000-file cases.
+- Vitest: 44 tests passed, including mocked API integration and 25,000-file cases.
 - Production build: attempted with Turbopack and webpack; **blocked by the execution sandbox**. Turbopack cannot bind its internal socket (EPERM). Webpack cannot spawn TypeScript's configuration subprocess (spawnSync EPERM).
 - Playwright: attempted; preview server cannot bind 0.0.0.0:3000 (EPERM). Chromium installation also failed because cdn.playwright.dev cannot resolve.
 - Real GitHub smoke: unavailable; api.github.com cannot resolve.
@@ -89,7 +89,27 @@ Aggregate foundations are explicitly labelled with represented file counts. Thei
 
 At most 512 child-district foundations and 40 district labels appear in one scene. A visible message discloses the foundation limit; the paginated navigator exposes every child. The file browser and district navigator each mount at most 100 rows per page.
 
-Bodies, roof accents and district foundations use three instanced meshes. The construction sequence updates only the currently visible buildings and stops uploading matrices afterward. Selection uses a separate highlight instead of recoloring all buildings each frame. Window patterns use a material shader without extra per-window geometry. Picking is restricted to the active scene representation.
+Bodies, roof accents and district foundations use three instanced meshes; whole-city aggregate blocks add one instanced mesh. The construction sequence updates only the currently visible buildings and stops uploading matrices afterward. Selection uses a separate highlight instead of recoloring all buildings each frame. Window patterns use a material shader without extra per-window geometry. Picking is restricted to the active scene representation.
+
+## Whole-city view
+
+Use **Whole city** beside **Districts** in the upper-left controls to see the complete repository footprint at once. District exploration remains available. Clicking a file, using search, or entering a district returns to detailed district navigation.
+
+Up to 8,000 files appear as individual buildings. Beyond that, a deterministic spatial grid produces at most 8,000 visible items: singleton cells retain their actual file buildings, while cells containing multiple files become clearly disclosed aggregate blocks. Every loaded file contributes exactly once. No sampling or pagination removes files from this view.
+
+Blocks preserve spatial location and show the dominant language by file count, with alphabetical tie-breaking. Block height uses the average file's byte size through the same bounded logarithmic scale as individual buildings. Hover shows the count and dominant language; click enters the deepest directory shared by the block's files. This may be the repository root for blocks spanning multiple directories. Search always provides direct access to individual files.
+
+Preparation runs in the existing Web Worker when the repository loads. The result is reused when switching views. Aggregate instance buffers initialize once, without per-frame updates. Screenshot export identifies whole-city mode and its aggregate block count. Existing retrieval deadlines and API rate limits still apply; there is no new repository file-count rejection. The item budget bounds rendering work, not total repository memory.
+
+Additional synthetic preparation measurements on the same machine (single run, excluding layout, worker transfer, browser and GPU):
+
+| Files represented | Individual buildings | Aggregate blocks | Whole-city preparation |
+| ---: | ---: | ---: | ---: |
+| 5,000 | 5,000 | 0 | 0.18 ms |
+| 25,000 | 69 | 4,820 | 28.98 ms |
+| 100,000 | 42 | 6,614 | 81.46 ms |
+
+Reproduce with `node node_modules/vite-node/vite-node.mjs scripts/benchmark-whole.ts`. These are CPU preparation timings, not navigation FPS guarantees. Visual and browser interaction checks remain blocked by the environment described above.
 
 ## CPU measurements
 
@@ -113,14 +133,16 @@ app/
   layout.tsx               Document metadata
 components/
   City.tsx                 Instanced architecture, shader, camera and PNG capture
+  CityBlocks.tsx           Static instanced whole-city aggregates
   DistrictList.tsx         Paginated district navigation
   FileBrowser.tsx          Paginated accessible file list
 lib/
   github.ts                Bounded traversal, retries and GitHub errors
   model.ts                 Classification, normalization, search and links
   layout.ts                Pure deterministic hierarchy and packing
-  layout.worker.ts         Background planning
-  view.ts                  Progressive representation and ancestor counts
+  layout.worker.ts         Background layout and whole-city preparation
+  view.ts                  Progressive district representation and ancestor counts
+  whole-city.ts            Bounded spatial synopsis accounting for every file
   store.ts                 Selection, district navigation and file blocks
 scripts/benchmark.ts        Reproducible synthetic CPU measurement
 tests/

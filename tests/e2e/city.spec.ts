@@ -13,3 +13,28 @@ test('exports an actual PNG',async({page})=>{await page.route('**/api/repository
 test('optional real public GitHub smoke test',async({request})=>{test.skip(process.env.REAL_GITHUB_SMOKE!=='1','Enable explicitly when network is available');const response=await request.get('/api/repository?q=octocat/Hello-World');expect(response.ok()).toBeTruthy();expect((await response.json()).files.length).toBeGreaterThan(0)});
 test('shared repository links load without a form submission',async({page})=>{await page.route('**/api/repository?*',route=>route.fulfill({json:repository}));await page.goto('/?repo=example/architecture');await expect(page.getByRole('heading',{name:'architecture / CITY'})).toBeVisible();await page.getByRole('button',{name:'District navigator'}).click();await page.locator('.district-list').getByRole('button',{name:'src'}).click();await expect(page.getByRole('navigation',{name:'District path'})).toContainText('src');await page.getByRole('button',{name:'Parent'}).click();await expect(page.getByRole('navigation',{name:'District path'})).not.toContainText('Parent')});
 test('large repositories expose aggregates and searchable file detail',async({page})=>{const files=Array.from({length:21000},(_,i)=>({id:'src/d'+i%30+'/file'+i+'.ts',path:'src/d'+i%30+'/file'+i+'.ts',name:'file'+i+'.ts',directory:'src/d'+i%30,extension:'ts',language:'TypeScript',size:i}));await page.route('**/api/repository?*',route=>route.fulfill({json:{...repository,files}}));await page.goto('/?repo=example/architecture');await expect(page.locator('.view-info')).toContainText('21,000 files');await page.getByRole('combobox').fill('file20999.ts');await page.getByRole('combobox').press('Enter');await expect(page.getByRole('heading',{name:'file20999.ts'})).toBeVisible();await expect(page.getByRole('navigation',{name:'District path'})).toContainText('src/d29')});
+test('whole-city view shows all files together and returns to district detail',async({page})=>{
+ await page.route('**/api/repository?*',route=>route.fulfill({json:repository}));
+ await page.goto('/?repo=example/architecture');
+ await expect(page.getByRole('heading',{name:'architecture / CITY'})).toBeVisible();
+ const whole=page.getByRole('button',{name:'Whole city',exact:true});
+ await whole.click();
+ await expect(whole).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('.view-info')).toContainText('2 files represented');
+ await expect(page.locator('.view-info')).toContainText('Every file is visible as an individual building');
+ await page.getByRole('combobox').fill('main.ts');
+ await page.getByRole('combobox').press('Enter');
+ await expect(page.getByRole('heading',{name:'main.ts'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Districts',exact:true})).toHaveAttribute('aria-pressed','true');
+});
+test('large whole-city view identifies aggregation without dropping files',async({page})=>{
+ const files=Array.from({length:21000},(_,i)=>({id:'src/d'+i%30+'/file'+i+'.ts',path:'src/d'+i%30+'/file'+i+'.ts',name:'file'+i+'.ts',directory:'src/d'+i%30,extension:'ts',language:'TypeScript',size:i}));
+ await page.route('**/api/repository?*',route=>route.fulfill({json:{...repository,files}}));
+ await page.goto('/?repo=example/architecture');
+ await page.getByRole('button',{name:'Whole city',exact:true}).click();
+ await expect(page.locator('.view-info')).toContainText('21,000 files represented');
+ await expect(page.locator('.view-info')).toContainText('spatial aggregate blocks');
+ await expect(page.locator('.pagination')).toHaveCount(0);
+ await page.getByRole('button',{name:'Districts',exact:true}).click();
+ await expect(page.locator('.view-info')).toContainText('District overview');
+});

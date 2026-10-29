@@ -7,9 +7,11 @@ import {OrbitControls as Controls} from 'three-stdlib';
 import {City as CityData,Building,District} from '@/lib/layout';
 import {landmark,palette} from '@/lib/model';
 import {cityView,districtCounts} from '@/lib/view';
+import CityBlocks from './CityBlocks';
+import {WholeCity} from '@/lib/whole-city';
 import {useCity} from '@/lib/store';
 
-export interface SceneProps {city:CityData;labels:boolean;reset:number;skip:boolean;capture:number;page:number;tour:boolean;onFailure:()=>void}
+export interface SceneProps {city:CityData;whole:WholeCity;labels:boolean;reset:number;skip:boolean;capture:number;page:number;tour:boolean;onFailure:()=>void}
 const object=new THREE.Object3D();
 function Buildings({buildings,skip}:{buildings:Building[];skip:boolean}){
  const body=useRef<THREE.InstancedMesh>(null);const roof=useRef<THREE.InstancedMesh>(null);
@@ -40,9 +42,9 @@ function Foundations({districts,aggregate,counts,labels}:{districts:District[];a
  return <><instancedMesh ref={mesh} args={[undefined,undefined,districts.length]} onClick={e=>{e.stopPropagation();if(e.instanceId!==undefined)navigate(districts[e.instanceId].path)}}><boxGeometry/><meshStandardMaterial roughness={.95}/></instancedMesh>
  {labels&&districts.slice(0,40).map(d=><Html key={d.path} center position={[d.x,aggregate?Math.min(12,1+Math.log2((counts.get(d.path)??0)+1))+1:.3,d.z+d.depth/2-1]} distanceFactor={Math.max(40,Math.min(d.width,d.depth)*2)} zIndexRange={[3,0]}><button className="district-label" onClick={()=>navigate(d.path)}>{d.path.split('/').pop()} <span>↗</span>{aggregate&&<small>AGGREGATE · {(counts.get(d.path)??0).toLocaleString()} FILES</small>}</button></Html>)}</>;
 }
-function World({city,labels,reset,skip,capture,page,tour,onFailure}:SceneProps){
- const controls=useRef<Controls>(null);const {gl,scene,camera,size}=useThree();const district=useCity(s=>s.district);const focus=useCity(s=>s.focus);const revision=useCity(s=>s.revision);
- const view=useMemo(()=>cityView(city,district,page),[city,district,page]);const counts=useMemo(()=>districtCounts(city),[city]);const visibleDistricts=useMemo(()=>view.children.slice(0,512),[view.children]);
+function World({city,whole,labels,reset,skip,capture,page,tour,onFailure}:SceneProps){
+ const lastCapture=useRef(capture);const mode=useCity(s=>s.mode);const controls=useRef<Controls>(null);const {gl,scene,camera,size}=useThree();const district=useCity(s=>s.district);const focus=useCity(s=>s.focus);const revision=useCity(s=>s.revision);
+ const view=useMemo(()=>cityView(city,mode==='whole'?'/':district,page),[city,district,page,mode]);const counts=useMemo(()=>districtCounts(city),[city]);const visibleDistricts=useMemo(()=>view.children.slice(0,512),[view.children]);
  const reduced=useMemo(()=>matchMedia('(prefers-reduced-motion: reduce)').matches,[]);const destination=useRef(new THREE.Vector3());const target=useRef(new THREE.Vector3());const moving=useRef(true);
  const span=Math.max(city.width,city.depth);const tourAge=useRef(0);
  useEffect(()=>{const element=gl.domElement;const lost=(event:Event)=>{event.preventDefault();onFailure()};element.addEventListener('webglcontextlost',lost);return()=>element.removeEventListener('webglcontextlost',lost)},[gl,onFailure]);
@@ -59,14 +61,14 @@ function World({city,labels,reset,skip,capture,page,tour,onFailure}:SceneProps){
  if(moving.current){camera.position.lerp(destination.current,alpha);controls.current.target.lerp(target.current,alpha);controls.current.update();if(camera.position.distanceTo(destination.current)<.05&&controls.current.target.distanceTo(target.current)<.05)moving.current=false}
  else if(tour&&!reduced){tourAge.current+=Math.min(dt,.1);const angle=tourAge.current*.12;const offset=destination.current.clone().sub(target.current);const x=offset.x*Math.cos(angle)+offset.z*Math.sin(angle);const z=offset.z*Math.cos(angle)-offset.x*Math.sin(angle);camera.position.set(target.current.x+x,destination.current.y,target.current.z+z);controls.current.target.copy(target.current);controls.current.update()}
  });
- useEffect(()=>{if(!capture)return;gl.render(scene,camera);const output=document.createElement('canvas');output.width=1920;output.height=1080;const ctx=output.getContext('2d');if(!ctx)return;const canvas=gl.domElement;ctx.fillStyle='#0c151e';ctx.fillRect(0,0,1920,1080);const scale=Math.min(1920/canvas.width,1080/canvas.height);ctx.drawImage(canvas,(1920-canvas.width*scale)/2,(1080-canvas.height*scale)/2,canvas.width*scale,canvas.height*scale);ctx.fillStyle='#d9d4c4';ctx.font='18px monospace';ctx.fillText('GITHUB CITY  /  ARCHITECTURE OF CODE',40,1010);ctx.font='13px monospace';ctx.fillText(view.aggregate?'DISTRICT AGGREGATES / '+view.descendantCount.toLocaleString()+' FILES / '+district:'INDIVIDUAL FILE BUILDINGS / '+district,40,1040);output.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='github-city.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)},'image/png')},[capture,gl,scene,camera,view.aggregate,view.descendantCount,district]);
+ useEffect(()=>{if(!capture||capture===lastCapture.current)return;lastCapture.current=capture;gl.render(scene,camera);const output=document.createElement('canvas');output.width=1920;output.height=1080;const ctx=output.getContext('2d');if(!ctx)return;const canvas=gl.domElement;ctx.fillStyle='#0c151e';ctx.fillRect(0,0,1920,1080);const scale=Math.min(1920/canvas.width,1080/canvas.height);ctx.drawImage(canvas,(1920-canvas.width*scale)/2,(1080-canvas.height*scale)/2,canvas.width*scale,canvas.height*scale);ctx.fillStyle='#d9d4c4';ctx.font='18px monospace';ctx.fillText('GITHUB CITY  /  ARCHITECTURE OF CODE',40,1010);ctx.font='13px monospace';ctx.fillText(mode==='whole'?'WHOLE CITY / '+whole.fileCount.toLocaleString()+' FILES / '+whole.blocks.length.toLocaleString()+' AGGREGATE BLOCKS':view.aggregate?'DISTRICT AGGREGATES / '+view.descendantCount.toLocaleString()+' FILES / '+district:'INDIVIDUAL FILE BUILDINGS / '+district,40,1040);output.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='github-city.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)},'image/png')},[capture,gl,scene,camera,view.aggregate,view.descendantCount,district,mode,whole]);
  return <><color attach="background" args={['#0c151e']}/><fog attach="fog" args={['#0c151e',span*2.5,span*6]}/>
  <ambientLight intensity={.65}/><hemisphereLight args={['#d2e5ed','#35404a',1.9]}/><directionalLight position={[40,80,35]} intensity={3} color="#ffdfaf"/><directionalLight position={[-50,30,-40]} intensity={1.8} color="#9bb6d1"/>
  <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.12,0]}><planeGeometry args={[span*10,span*10]}/><meshStandardMaterial color="#101d27" roughness={1}/></mesh>
  <gridHelper args={[span*4,100,'#253743','#182934']} position={[0,-.09,0]}/>
  <mesh position={[view.district.x,-.04,view.district.z]}><boxGeometry args={[view.district.width,.13,view.district.depth]}/><meshStandardMaterial color="#182a36"/></mesh>
- <Foundations districts={visibleDistricts} aggregate={view.aggregate} counts={counts} labels={labels}/>
- <Buildings key={district+':'+page+':'+view.buildings.length} buildings={view.buildings} skip={skip}/>
+ <Foundations districts={visibleDistricts} aggregate={mode==='district'&&view.aggregate} counts={counts} labels={labels}/>
+ <Buildings key={mode+':'+district+':'+page+':'+view.buildings.length} buildings={mode==='whole'?whole.buildings:view.buildings} skip={skip||mode==='whole'}/>{mode==='whole'&&<CityBlocks blocks={whole.blocks}/>}
  <OrbitControls ref={controls} enabled={!tour||reduced} makeDefault enableDamping dampingFactor={.08} rotateSpeed={.65} zoomSpeed={.8} panSpeed={.75} screenSpacePanning={false} minDistance={5} maxDistance={span*4} minPolarAngle={.12} maxPolarAngle={Math.PI/2.35} onStart={()=>{moving.current=false}}/>
  </>;
 }
