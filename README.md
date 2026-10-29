@@ -12,11 +12,11 @@ Checked in the current environment on October 29, 2026:
 | --- | --- |
 | TypeScript strict checking | Passed |
 | ESLint | Passed without warnings |
-| Unit and mocked integration tests | 87 passed |
+| Unit and mocked integration tests | 93 passed (single worker) |
 | Production build | Blocked by sandbox subprocess restrictions |
 | Playwright | Blocked because the preview server cannot bind its port |
 | Live public GitHub smoke | Attempted for Hello World, React, and TypeScript; API hostname could not resolve |
-| Browser inspection, lighting appearance, and actual PNG download | Unverified |
+| Browser inspection, lighting appearance, and actual PNG download | Unverified; top-down landscape diagnostics inspected for 120, 5,000 and 100,000 synthetic files |
 | Deployment | Not performed |
 
 Webpack's Next build reports that it cannot parse TypeScript's configuration output. A direct subprocess diagnostic returns `spawnSync /usr/bin/node EPERM` with empty output. Preview returns `listen EPERM 0.0.0.0:3000`. These checks must be rerun outside this execution sandbox before a release.
@@ -93,7 +93,7 @@ Architecture describes visual scale, not literal meters or an inferred code role
 
 ### Urban planning
 
-The visible data is projected into directory neighborhoods. Within each neighborhood, buildings occupy deterministic lots in four-by-four blocks, separated by streets. Reserved empty lots and forecourts provide parks and plazas. Shelf packing connects neighborhoods through an avenue backbone. Roads have avenue, secondary-street, and local-lane widths.
+The visible data is projected into directory neighborhoods. Within each neighborhood, buildings occupy deterministic lots in four-by-four blocks, separated by streets. Reserved empty lots and forecourts provide plazas. A separate land-use pass reclaims unused ground across and between neighborhoods for continuous lawns, pocket gardens, and larger parks. Shelf packing connects neighborhoods through an avenue backbone. Roads have avenue, secondary-street, and local-lane widths.
 
 City density uses a continuous logarithmic file-count factor rather than a list of small/medium/large city presets. Data units retain their identity and exact counts through projection. Coordinates are local to the active view; drilling into a directory recenters its neighborhood.
 
@@ -107,7 +107,7 @@ City density uses a continuous logarithmic file-count factor rather than a list 
 
 Decorative structures use muted neutral materials, have no data labels or window lights, and cannot intercept raycasting. Environment placement is checked against repository footprints. Decorations near a selected building are suppressed, the sign hides during inspection, and selection outlines render clearly above scenery.
 
-Environmental detail is bounded: at most 128 neighborhoods receive full internal street detail, with an avenue backbone for all neighborhoods; 64 park/plaza plots, 128 trees, 96 lamps, 48 benches, and 24 background structures are supported. Available free space can produce fewer objects, including no background structures. This does not omit repository data.
+Environmental detail is bounded: at most 128 neighborhoods receive full internal street detail, with an avenue backbone for all neighborhoods. The landscape pass examines at most 192 × 192 ground cells, protects foundations, aggregate podiums, roads and sidewalks, then merges free cells into non-overlapping lawns. Broad parks receive longitudinal walking paths and area-weighted seeded groves; narrow strips receive low planting. Tree size and cluster spread adapt to the available park width. Budgets are 3,072 lawn patches, 128 paths, 512 trees, 768 shrubs, 96 lamps, 48 benches, and 24 background structures. Available free space can produce fewer objects, including no background structures. Very narrow or sub-cell spaces remain unplanted to preserve clearance. This does not omit repository data.
 
 ### Navigation and presentation
 
@@ -115,7 +115,7 @@ The initial scene is the whole-repository overview. Select a directory or its ag
 
 Drag to orbit, right-drag to pan, and scroll/pinch to zoom. The visible **Pan** control changes left-drag to pan. **Reset camera** fits the active map. Focus transitions respect reduced motion and are interrupted by manual camera input.
 
-Lighting uses a hemisphere, directional sunlight, warm facade emission, and local shadows near the inspection target. Distant views reduce environmental detail and disable shadows. Sustained low frame rates reduce rendering resolution and decorative detail; idle demand-rendering gaps are excluded from frame-rate sampling. Roof silhouettes remain present at a distance so apparent height is preserved. No bloom, particles, traffic simulation, or free-flight controls are included.
+Lighting uses a hemisphere, directional sunlight, warm facade emission, and local shadows near the inspection target. Distant views retain low-poly tree canopies and lawns while hiding small props and disabling shadows. Sustained low frame rates reduce rendering resolution and decorative detail; idle demand-rendering gaps are excluded from frame-rate sampling. Roof silhouettes remain present at a distance so apparent height is preserved. No bloom, particles, traffic simulation, or free-flight controls are included.
 
 **Export PNG** captures actual rendered WebGL content at 1920×1080 with letterboxing. Its footer identifies the repository, represented-file count, and height encodings. HTML file/district labels and surrounding UI are not part of the WebGL capture; the physical city sign uses a canvas texture and is included if visible. Browser export and visual appearance remain unverified in this environment.
 
@@ -181,9 +181,11 @@ One synthetic whole-repository run on Linux, Node v26.12.1, Intel Core i7-1165G7
 
 | Files represented | Preparation | Urban layout | Environment placement | Repository units | Roads | Trees | Background structures |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 5,000 | 11.18 ms | 7.11 ms | 7.81 ms | 5,000 | 614 | 81 | 0 |
-| 25,000 | 64.08 ms | 3.10 ms | 6.65 ms | 2,906 | 614 | 128 | 24 |
-| 100,000 | 247.53 ms | 2.44 ms | 7.04 ms | 1,410 | 425 | 128 | 24 |
+| 5,000 | 13.36 ms | 6.97 ms | 48.48 ms | 5,000 | 614 | 308 | 0 |
+| 25,000 | 102.26 ms | 3.61 ms | 43.73 ms | 2,906 | 614 | 395 | 24 |
+| 100,000 | 356.52 ms | 2.43 ms | 39.04 ms | 1,410 | 425 | 354 | 24 |
+
+The landscape pass produced 505, 351, and 149 lawn patches respectively, with 157, 137, and 134 shrubs. These CPU measurements include the new land-use and planting pass; they are not GPU frame-rate measurements.
 
 The 100,000-file fixture produces 1,247 high-rise and 163 mid-rise representations, accounting for all 100,000 files exactly once. The fixture uses a src directory with 100 child directories and progressively increasing file sizes. This is synthetic data, not a benchmark of React or TypeScript repositories.
 
@@ -219,7 +221,8 @@ lib/
   model.ts                 URL parsing, normalization, language detection
   building-style.ts        Height-based archetypes, seeded variants, facade pixels
   urban-layout.ts          District lots, blocks, roads, and reserved spaces
-  environment.ts           Collision-checked secondary-object placement
+  environment.ts           Collision-checked groves, gardens and secondary objects
+  landscape.ts             Bounded vacant-land raster, coalescing and clearance index
   explorer.ts              Directory index, search, statistics, tree rows
   navigation.ts            Pure typed navigation reducer
   layout.ts                Pure deterministic layout

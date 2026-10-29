@@ -4,27 +4,30 @@ import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { environmentPlan, Prop } from '@/lib/environment';
 import { UrbanPlan } from '@/lib/urban-layout';
+import { seed } from '@/lib/building-style';
 interface Instance extends Prop {
     y: number;
     color?: string;
 }
 const noPick = () => { };
-function PropsBatch({ items, color, shape = 'box', emissive = false }: {
+function PropsBatch({ items, color, shape = 'box', emissive = false, detail = 1 }: {
     items: Instance[];
     color: string;
     shape?: 'box' | 'tree';
     emissive?: boolean;
+    detail?: number;
 }) {
     const mesh = useRef<THREE.InstancedMesh>(null);
     useLayoutEffect(() => {
         if (!mesh.current)
             return;
-        const object = new THREE.Object3D();
-        items.forEach((p, i) => { object.position.set(p.x, p.y, p.z); object.rotation.set(0, p.rotation ?? 0, 0); object.scale.set(p.width, p.height, p.depth); object.updateMatrix(); mesh.current!.setMatrixAt(i, object.matrix); });
+        const object = new THREE.Object3D(), tint = new THREE.Color();
+        items.forEach((p, i) => { object.position.set(p.x, p.y, p.z); object.rotation.set(0, p.rotation ?? 0, 0); object.scale.set(p.width, p.height, p.depth); object.updateMatrix(); mesh.current!.setMatrixAt(i, object.matrix); mesh.current!.setColorAt(i, tint.set(p.color ?? '#ffffff')); });
         mesh.current.instanceMatrix.needsUpdate = true;
+        if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
         mesh.current.computeBoundingSphere();
     }, [items]);
-    return <instancedMesh ref={mesh} args={[undefined, undefined, items.length]} raycast={noPick} receiveShadow>{shape === 'tree' ? <icosahedronGeometry args={[.5, 1]}/> : <boxGeometry />}<meshStandardMaterial color={color} roughness={.9} emissive={emissive ? color : '#000000'} emissiveIntensity={emissive ? .65 : 0}/></instancedMesh>;
+    return <instancedMesh ref={mesh} args={[undefined, undefined, items.length]} raycast={noPick} receiveShadow>{shape === 'tree' ? <icosahedronGeometry args={[.5, detail]}/> : <boxGeometry />}<meshStandardMaterial color={color} roughness={.9} emissive={emissive ? color : '#000000'} emissiveIntensity={emissive ? .65 : 0}/></instancedMesh>;
 }
 function CitySign({ title, x, z }: {
     title: string;
@@ -66,7 +69,7 @@ export default function Environment({ plan, dark, near, background, title, selec
     };
 }) {
     const props = useMemo(() => environmentPlan(plan), [plan]);
-    const visible = useMemo(() => { const clear = (p: Prop) => !focus || Math.hypot(p.x - focus.x, p.z - focus.z) > 3 + Math.max(p.width, p.depth) / 2; return { ...props, trees: props.trees.filter(clear), lamps: props.lamps.filter(clear), benches: props.benches.filter(clear), background: props.background.filter(clear) }; }, [props, focus]);
+    const visible = useMemo(() => { const clear = (p: Prop) => !focus || Math.hypot(p.x - focus.x, p.z - focus.z) > 3 + Math.max(p.width, p.depth) / 2; return { ...props, trees: props.trees.filter(clear), shrubs: props.shrubs.filter(clear), lamps: props.lamps.filter(clear), benches: props.benches.filter(clear), background: props.background.filter(clear) }; }, [props, focus]);
     const surfaces = useMemo(() => {
         const roads: Instance[] = [], walks: Instance[] = [], markings: Instance[] = [];
         for (const road of plan.roads) {
@@ -87,8 +90,10 @@ export default function Environment({ plan, dark, near, background, title, selec
     }, [plan]);
     const parks = useMemo(() => props.parks.map(p => ({ ...p, y: p.height / 2 })), [props]);
     const plazas = useMemo(() => props.plazas.map(p => ({ ...p, y: p.height / 2 })), [props]);
-    const trunks = useMemo(() => visible.trees.map(p => ({ ...p, y: .45, width: .07, depth: .07, height: .7 })), [visible]);
-    const crowns = useMemo(() => visible.trees.map(p => ({ ...p, y: .75 + p.height / 2 })), [visible]);
+    const paths = useMemo(() => props.paths.map(p => ({ ...p, y: p.height / 2 + .035 })), [props]);
+    const trunks = useMemo(() => visible.trees.map(p => ({ ...p, y: .035 + p.height * .25, width: .08, depth: .08, height: p.height * .5 })), [visible]);
+    const crowns = useMemo(() => visible.trees.map(p => ({ ...p, y: .035 + p.height * .65, height: p.height * .7, color: ['#d8e4bf', '#bbd4b0', '#e2e7cc', '#bdd2bc'][seed(p.id) % 4] })), [visible]);
+    const shrubs = useMemo(() => visible.shrubs.map(p => ({ ...p, y: .035 + p.height / 2 })), [visible]);
     const poles = useMemo(() => visible.lamps.map(p => ({ ...p, y: p.height / 2 + .1, width: .045, depth: .045 })), [visible]);
     const bulbs = useMemo(() => visible.lamps.map(p => ({ ...p, y: p.height + .1, width: .2, depth: .14, height: .07 })), [visible]);
     const benches = useMemo(() => visible.benches.map(p => ({ ...p, y: .22 })), [visible]);
@@ -97,9 +102,11 @@ export default function Environment({ plan, dark, near, background, title, selec
   <PropsBatch items={surfaces.roads} color={dark ? '#252e38' : '#59616a'}/>
   <PropsBatch items={surfaces.walks} color={dark ? '#626a6d' : '#bbc0bc'}/>
   <PropsBatch items={surfaces.markings} color="#c6c4ac"/>
-  <PropsBatch items={parks} color={dark ? '#435d4e' : '#9aaf91'}/>
+  <PropsBatch items={parks} color={dark ? '#3b5142' : '#9aac87'}/>
   <PropsBatch items={plazas} color={dark ? '#626363' : '#c2bcae'}/>
-  <group visible={near}><PropsBatch items={trunks} color="#6d6150"/><PropsBatch items={crowns} color={dark ? '#496756' : '#729472'} shape="tree"/>
+  <PropsBatch items={paths} color={dark ? '#77796b' : '#c5bea2'}/>
+  <PropsBatch items={crowns} color={dark ? '#496756' : '#648660'} shape="tree" detail={near ? 1 : 0}/>
+  <group visible={near}><PropsBatch items={trunks} color="#6d6150"/><PropsBatch items={shrubs} color={dark ? '#50664c' : '#77915f'} shape="tree"/>
    <PropsBatch items={poles} color="#59636a"/><PropsBatch items={bulbs} color="#e9d7a3" emissive={dark}/><PropsBatch items={benches} color="#8a7d66"/>
    {background && <PropsBatch items={backdrops} color={dark ? '#3d464d' : '#9ba3a5'}/>}
   </group>
