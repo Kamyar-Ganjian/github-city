@@ -1,4 +1,10 @@
-import {layout} from './layout';
-import {wholeCity} from './whole-city';
-import {FileNode} from './model';
-self.onmessage=(event:MessageEvent<FileNode[]>)=>{try{const city=layout(event.data);self.postMessage({city,whole:wholeCity(city)})}catch(error){self.postMessage({error:error instanceof Error?error.message:'Layout failed'})}};
+import { prepareRepository } from './prepare';
+import { FileNode } from './model';
+self.onmessage = (event: MessageEvent<FileNode[]>) => {
+    try {
+        self.postMessage({ prepared: prepareRepository(event.data) });
+    }
+    catch (error) {
+        self.postMessage({ error: error instanceof Error ? error.message : 'Repository preparation failed.' });
+    }
+};

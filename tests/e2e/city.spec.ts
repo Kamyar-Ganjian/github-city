@@ -1,40 +1,71 @@
-import {test,expect} from '@playwright/test';
-const repository={owner:'example',name:'architecture',branch:'develop',description:'A test repository',stars:5,files:[{id:'src/main.ts',path:'src/main.ts',name:'main.ts',directory:'src',extension:'ts',language:'TypeScript',size:3000},{id:'README.md',path:'README.md',name:'README.md',directory:'/',extension:'md',language:'Markdown',size:500}]};
-test('load, search, select, inspect and browse',async({page})=>{
- await page.route('**/api/repository?*',route=>route.fulfill({json:repository}));
- await page.goto('/');await page.getByLabel('START WITH A PUBLIC GITHUB REPOSITORY').fill('example/architecture');await page.getByRole('button',{name:'Explore city'}).click();
- await expect(page.getByRole('heading',{name:'architecture / CITY'})).toBeVisible();
- await page.getByRole('combobox').fill('main');await page.getByRole('combobox').press('ArrowDown');await page.getByRole('combobox').press('Enter');
- await expect(page.getByRole('heading',{name:'main.ts'})).toBeVisible();await expect(page.getByRole('link',{name:'Open file on GitHub'})).toHaveAttribute('href','https://github.com/example/architecture/blob/develop/src/main.ts');
- await page.getByRole('button',{name:'File browser',exact:false}).click();await expect(page.getByRole('heading',{name:'Repository file browser'})).toBeVisible();
+import { test, expect } from '@playwright/test';
+const repository = { owner: 'example', name: 'architecture', branch: 'develop', description: 'A repository fixture', stars: 5, files: [{ id: 'src/main.ts', path: 'src/main.ts', name: 'main.ts', directory: 'src', extension: 'ts', language: 'TypeScript', size: 3000 }, { id: 'README.md', path: 'README.md', name: 'README.md', directory: '/', extension: 'md', language: 'Markdown', size: 500 }] };
+test.beforeEach(async ({ page }) => { await page.route('**/api/repository?*', route => route.fulfill({ json: repository })); });
+test('loads real pipeline shape, searches, reveals tree, and inspects metadata', async ({ page }) => {
+    await page.goto('/');
+    await page.getByLabel('GitHub repository URL or owner/repository').fill('example/architecture');
+    await page.getByRole('button', { name: 'Explore repository' }).click();
+    await expect(page.getByRole('heading', { name: 'Repository overview' })).toBeVisible();
+    await page.getByRole('combobox').fill('main.ts');
+    await page.getByRole('combobox').press('ArrowDown');
+    await page.getByRole('combobox').press('Enter');
+    await expect(page.getByRole('heading', { name: 'main.ts', exact: true })).toBeVisible();
+    await expect(page.getByRole('treeitem', { name: /main.ts/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('link', { name: 'Open file on GitHub' })).toHaveAttribute('href', 'https://github.com/example/architecture/blob/develop/src/main.ts');
+    await expect(page.getByRole('navigation', { name: 'Repository path' })).toContainText('src');
 });
-test('API errors are announced',async({page})=>{await page.route('**/api/repository?*',route=>route.fulfill({status:429,json:{error:'GitHub request limit reached.'}}));await page.goto('/');await page.getByRole('button',{name:'React',exact:false}).first().click();await expect(page.getByRole('alert')).toContainText('request limit')});
-test('exports an actual PNG',async({page})=>{await page.route('**/api/repository?*',route=>route.fulfill({json:repository}));await page.goto('/');await page.getByRole('button',{name:'React',exact:false}).first().click();await expect(page.locator('canvas')).toBeVisible();await page.getByRole('button',{name:'Present',exact:false}).click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download PNG'}).click();expect((await download).suggestedFilename()).toBe('github-city.png')});
-test('optional real public GitHub smoke test',async({request})=>{test.skip(process.env.REAL_GITHUB_SMOKE!=='1','Enable explicitly when network is available');const response=await request.get('/api/repository?q=octocat/Hello-World');expect(response.ok()).toBeTruthy();expect((await response.json()).files.length).toBeGreaterThan(0)});
-test('shared repository links load without a form submission',async({page})=>{await page.route('**/api/repository?*',route=>route.fulfill({json:repository}));await page.goto('/?repo=example/architecture');await expect(page.getByRole('heading',{name:'architecture / CITY'})).toBeVisible();await page.getByRole('button',{name:'District navigator'}).click();await page.locator('.district-list').getByRole('button',{name:'src'}).click();await expect(page.getByRole('navigation',{name:'District path'})).toContainText('src');await page.getByRole('button',{name:'Parent'}).click();await expect(page.getByRole('navigation',{name:'District path'})).not.toContainText('Parent')});
-test('large repositories expose aggregates and searchable file detail',async({page})=>{const files=Array.from({length:21000},(_,i)=>({id:'src/d'+i%30+'/file'+i+'.ts',path:'src/d'+i%30+'/file'+i+'.ts',name:'file'+i+'.ts',directory:'src/d'+i%30,extension:'ts',language:'TypeScript',size:i}));await page.route('**/api/repository?*',route=>route.fulfill({json:{...repository,files}}));await page.goto('/?repo=example/architecture');await expect(page.locator('.view-info')).toContainText('21,000 files');await page.getByRole('combobox').fill('file20999.ts');await page.getByRole('combobox').press('Enter');await expect(page.getByRole('heading',{name:'file20999.ts'})).toBeVisible();await expect(page.getByRole('navigation',{name:'District path'})).toContainText('src/d29')});
-test('whole-city view shows all files together and returns to district detail',async({page})=>{
- await page.route('**/api/repository?*',route=>route.fulfill({json:repository}));
- await page.goto('/?repo=example/architecture');
- await expect(page.getByRole('heading',{name:'architecture / CITY'})).toBeVisible();
- const whole=page.getByRole('button',{name:'Whole city',exact:true});
- await whole.click();
- await expect(whole).toHaveAttribute('aria-pressed','true');
- await expect(page.locator('.view-info')).toContainText('2 files represented');
- await expect(page.locator('.view-info')).toContainText('Every file is visible as an individual building');
- await page.getByRole('combobox').fill('main.ts');
- await page.getByRole('combobox').press('Enter');
- await expect(page.getByRole('heading',{name:'main.ts'})).toBeVisible();
- await expect(page.getByRole('button',{name:'Districts',exact:true})).toHaveAttribute('aria-pressed','true');
+test('supports tree keyboard selection and directory breadcrumbs', async ({ page }) => {
+    await page.goto('/?repo=example/architecture');
+    const tree = page.getByRole('tree');
+    await expect(tree).toBeVisible();
+    await tree.focus();
+    await tree.press('ArrowDown');
+    await tree.press('ArrowRight');
+    await tree.press('ArrowDown');
+    await tree.press('Enter');
+    await expect(page.getByRole('heading', { name: 'main.ts', exact: true })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Repository path' }).getByRole('button').first().click();
+    await expect(page.getByRole('heading', { name: 'Repository overview' })).toBeVisible();
 });
-test('large whole-city view identifies aggregation without dropping files',async({page})=>{
- const files=Array.from({length:21000},(_,i)=>({id:'src/d'+i%30+'/file'+i+'.ts',path:'src/d'+i%30+'/file'+i+'.ts',name:'file'+i+'.ts',directory:'src/d'+i%30,extension:'ts',language:'TypeScript',size:i}));
- await page.route('**/api/repository?*',route=>route.fulfill({json:{...repository,files}}));
- await page.goto('/?repo=example/architecture');
- await page.getByRole('button',{name:'Whole city',exact:true}).click();
- await expect(page.locator('.view-info')).toContainText('21,000 files represented');
- await expect(page.locator('.view-info')).toContainText('spatial aggregate blocks');
- await expect(page.locator('.pagination')).toHaveCount(0);
- await page.getByRole('button',{name:'Districts',exact:true}).click();
- await expect(page.locator('.view-info')).toContainText('District overview');
+test('3D can be disabled while tree and inspector remain usable', async ({ page }) => {
+    await page.goto('/?repo=example/architecture');
+    await page.getByRole('button', { name: 'Hide 3D' }).click();
+    await expect(page.getByRole('heading', { name: 'Explore without 3D.' })).toBeVisible();
+    await page.getByRole('combobox').fill('README.md');
+    await page.getByRole('combobox').press('Enter');
+    await expect(page.getByRole('heading', { name: 'README.md', exact: true })).toBeVisible();
 });
+test('API errors are actionable', async ({ page }) => {
+    await page.unroute('**/api/repository?*');
+    await page.route('**/api/repository?*', route => route.fulfill({ status: 429, json: { error: 'GitHub request limit reached. Retry later.' } }));
+    await page.goto('/');
+    await page.getByRole('button', { name: 'React', exact: false }).first().click();
+    await expect(page.getByRole('alert')).toContainText('request limit');
+});
+test('exports an actual rendered PNG', async ({ page }) => {
+    await page.goto('/?repo=example/architecture');
+    await expect(page.locator('canvas')).toBeVisible();
+    const button = page.getByRole('button', { name: 'Export PNG' });
+    await expect(button).toBeEnabled();
+    const download = page.waitForEvent('download');
+    await button.click();
+    expect((await download).suggestedFilename()).toBe('github-city.png');
+});
+test('large flat repositories remain searchable with bounded tree DOM and paging', async ({ page }) => {
+    const files = Array.from({ length: 25001 }, (_, i) => ({ id: 'f' + String(i).padStart(5, '0') + '.ts', path: 'f' + String(i).padStart(5, '0') + '.ts', name: 'f' + String(i).padStart(5, '0') + '.ts', directory: '/', extension: 'ts', language: 'TypeScript', size: i }));
+    await page.unroute('**/api/repository?*');
+    await page.route('**/api/repository?*', route => route.fulfill({ json: { ...repository, files } }));
+    await page.goto('/?repo=example/architecture');
+    await expect(page.getByRole('heading', { name: 'Repository overview' })).toBeVisible();
+    expect(await page.getByRole('treeitem').count()).toBeLessThan(100);
+    await page.getByRole('combobox').fill('f25000.ts');
+    await page.getByRole('combobox').press('Enter');
+    await expect(page.getByRole('heading', { name: 'f25000.ts', exact: true })).toBeVisible();
+    await expect(page.getByRole('treeitem', { name: /f25000.ts/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.map-pagination')).toContainText('26 / 26');
+    await page.getByRole('button', { name: 'Whole repository', exact: true }).click();
+    await expect(page.locator('.map-description')).toContainText('25,001 of 25,001');
+});
+test('theme preferences persist', async ({ page }) => { await page.goto('/'); await page.getByRole('button', { name: /Color theme: system/ }).click(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'light'); await page.getByRole('button', { name: /Color theme: light/ }).click(); await page.reload(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark'); });
+test('mobile panels provide a complete non-3D explorer', async ({ page }) => { await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/?repo=example/architecture'); await expect(page.getByRole('tree')).toBeVisible(); await page.getByRole('combobox').fill('main.ts'); await page.getByRole('combobox').press('Enter'); await page.getByRole('button', { name: 'Details', exact: true }).click(); await expect(page.getByRole('heading', { name: 'main.ts', exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Map', exact: true }).click(); await expect(page.getByRole('button', { name: 'Reset camera' })).toBeVisible(); });
+test('optional live GitHub smoke', async ({ request }) => { test.skip(process.env.REAL_GITHUB_SMOKE !== '1', 'Opt in when public network access is available'); const response = await request.get('/api/repository?q=octocat/Hello-World'); expect(response.ok()).toBeTruthy(); expect((await response.json()).files.length).toBeGreaterThan(0); });
