@@ -1,5 +1,5 @@
 export interface FileNode {id:string;path:string;name:string;directory:string;extension:string;language:string;size:number}
-export interface Repository {owner:string;name:string;branch:string;description:string;stars:number;files:FileNode[]}
+export interface Repository {owner:string;name:string;branch:string;description:string;stars:number;files:FileNode[];submodules?:string[]}
 export const palette:Record<string,string>={TypeScript:'#7faee4',JavaScript:'#e5c77d',Python:'#86b99e',Rust:'#d7997f',Go:'#75c9ce',CSS:'#b69bd3',HTML:'#e5a17d',JSON:'#a8b99b',Markdown:'#a0afc3',Other:'#727f92'};
 export function parseRepository(input:string):{owner:string;name:string}{
  let value=input.trim().replace(/\/$/,'');
@@ -14,5 +14,8 @@ export function normalize(tree:unknown):FileNode[]{
  return tree.filter((n):n is {path:string;size:number;type:string}=>!!n&&typeof n.path==='string'&&n.type==='blob').map(n=>({id:n.path,path:n.path,name:n.path.split('/').pop()!,directory:n.path.includes('/')?n.path.slice(0,n.path.lastIndexOf('/')):'/',extension:n.path.includes('.')?n.path.split('.').pop()!:'',language:language(n.path),size:Number.isFinite(n.size)?Math.max(0,n.size):0})).sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
 }
 export const height=(size:number)=>Math.min(19,Math.max(.7,Math.log2(1+Math.max(0,size)/180)*1.7));
-export const searchFiles=(files:FileNode[],query:string)=>{const q=query.trim().toLowerCase();return q?files.filter(f=>f.path.toLowerCase().includes(q)).slice(0,60):[]};
+export const searchFiles=(files:FileNode[],query:string)=>{const q=query.trim().toLowerCase();return q?collectMatches(files,q):[]};
 export const fileUrl=(repo:Repository,file:FileNode)=>'https://github.com/'+repo.owner+'/'+repo.name+'/blob/'+repo.branch.split('/').map(encodeURIComponent).join('/')+'/'+file.path.split('/').map(encodeURIComponent).join('/');
+
+function collectMatches(files:FileNode[],q:string){const matches:FileNode[]=[];for(const file of files){if(file.path.toLowerCase().includes(q)){matches.push(file);if(matches.length===60)break}}return matches}
+export function landmark(file:FileNode){return /^(readme(\..*)?|package.json|dockerfile)$/i.test(file.name)}

@@ -1,2 +1,4 @@
 import next from 'eslint-config-next/core-web-vitals';
-export default [...next,{ignores:['.next/**','node_modules/**','test-results/**','playwright-report/**']}];
+const config = [...next,{ignores:['.next/**','node_modules/**','test-results/**','playwright-report/**']}];
+
+export default config;
