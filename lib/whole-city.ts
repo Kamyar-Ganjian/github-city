@@ -38,9 +38,10 @@ export function wholeCity(city: City, budget = WHOLE_CITY_BUDGET): WholeCity {
         throw new Error('Whole-city budget must be a positive integer.');
     if (city.buildings.length <= budget)
         return { buildings: city.buildings, blocks: [], fileCount: city.buildings.length };
+    const gridBudget = Math.min(budget, Math.max(256, Math.round(budget / Math.pow(city.buildings.length / budget, .65))));
     const width = Math.max(1, city.width), depth = Math.max(1, city.depth);
-    const nx = Math.max(1, Math.min(budget, Math.floor(Math.sqrt(budget * width / depth))));
-    const nz = Math.max(1, Math.floor(budget / nx));
+    const nx = Math.max(1, Math.min(gridBudget, Math.floor(Math.sqrt(gridBudget * width / depth))));
+    const nz = Math.max(1, Math.floor(gridBudget / nx));
     interface Cell {
         first: Building;
         count: number;
@@ -78,7 +79,7 @@ export function wholeCity(city: City, budget = WHOLE_CITY_BUDGET): WholeCity {
             continue;
         }
         const language = [...cell.languages].sort(([a, ac], [b, bc]) => bc - ac || (a < b ? -1 : a > b ? 1 : 0))[0][0];
-        blocks.push({ id: String(id), x: (cell.minX + cell.maxX) / 2, z: (cell.minZ + cell.maxZ) / 2, width: Math.min(9,cell.maxX - cell.minX + 1.55), depth: Math.min(9,cell.maxZ - cell.minZ + 1.55), height: aggregateHeight(cell.count), count: cell.count, bytes: cell.bytes, language, directory: cell.directory });
+        blocks.push({ id: String(id), x: (cell.minX + cell.maxX) / 2, z: (cell.minZ + cell.maxZ) / 2, width: Math.min(9, cell.maxX - cell.minX + 1.55), depth: Math.min(9, cell.maxZ - cell.minZ + 1.55), height: aggregateHeight(cell.count), count: cell.count, bytes: cell.bytes, language, directory: cell.directory });
     }
     return { buildings, blocks, fileCount: city.buildings.length };
 }

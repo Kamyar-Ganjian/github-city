@@ -39,7 +39,7 @@ describe('validation and GitHub failure boundaries', () => {
     it('reports upstream malformed JSON as an upstream failure', async () => { const request = vi.fn().mockResolvedValue(new Response('not json')); await expect(loadRepository('a/b', request)).rejects.toMatchObject({ status: 502 }); });
 });
 describe('practical framing', () => {
-    it('frames the visible aggregate rather than an empty underlying district', () => { const prepared = prepareRepository(normalize(Array.from({ length: 10000 }, (_, i) => ({ path: 'src/f' + i + '.ts', type: 'blob', size: i })))); const view = mapView(prepared, initialNavigation); expect(view.aggregates).toHaveLength(1); expect(view.bounds.width).toBeLessThanOrEqual(18); expect(view.maxHeight).toBeGreaterThan(1); });
+    it('frames the visible aggregate rather than an empty underlying district', () => { const prepared = prepareRepository(normalize(Array.from({ length: 10000 }, (_, i) => ({ path: 'src/f' + i + '.ts', type: 'blob', size: i })))); const view = mapView(prepared, initialNavigation); expect(view.aggregates).toHaveLength(1); expect(view.bounds.width).toBeLessThanOrEqual(32); expect(view.maxHeight).toBeGreaterThan(1); });
 });
 describe('overview usefulness', () => {
     it('ranks directory counts including nested entries with deterministic ties', () => {

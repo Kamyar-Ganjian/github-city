@@ -1,41 +1,73 @@
-import { FileNode } from './model';
-export type BuildingKind = 'source' | 'test' | 'configuration' | 'documentation' | 'asset' | 'other';
-export const buildingKinds: BuildingKind[] = ['source', 'test', 'configuration', 'documentation', 'asset', 'other'];
-export const buildingNames: Record<BuildingKind, string> = { source: 'Source tower', test: 'Test building', configuration: 'Configuration tower', documentation: 'Documentation slab', asset: 'Asset pavilion', other: 'General building' };
+import { FileNode, height } from './model';
+export type BuildingKind = 'townhouse' | 'apartment' | 'midrise' | 'highrise' | 'landmark';
+export const buildingKinds: BuildingKind[] = ['townhouse', 'apartment', 'midrise', 'highrise', 'landmark'];
+export const buildingNames: Record<BuildingKind, string> = { townhouse: 'House / townhouse', apartment: 'Low-rise apartment', midrise: 'Mid-rise building', highrise: 'High-rise tower', landmark: 'Landmark skyscraper' };
 export const buildingFootprints: Record<BuildingKind, {
     width: number;
     depth: number;
 }> = {
-    source: { width: 1.35, depth: 1.35 }, test: { width: 1.25, depth: 1.55 }, configuration: { width: 1, depth: 1 },
-    documentation: { width: 1.55, depth: .85 }, asset: { width: 1.55, depth: 1.35 }, other: { width: 1.3, depth: 1.3 }
+    townhouse: { width: 1.4, depth: 1.35 }, apartment: { width: 1.55, depth: 1.4 }, midrise: { width: 1.5, depth: 1.5 }, highrise: { width: 1.35, depth: 1.35 }, landmark: { width: 1.55, depth: 1.55 }
 };
-export function buildingKind(file: FileNode): BuildingKind {
-    if (/(^|\/)(__tests__|tests?|specs?)(\/|$)|\.(test|spec)\./i.test(file.path))
-        return 'test';
-    if (/^(readme|changelog|contributing|license)(\.|$)/i.test(file.name) || /\.(md|mdx|rst|txt|adoc|pdf)$/i.test(file.name))
-        return 'documentation';
-    if (/\.(png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|mp[34]|wav|ogg|glb|gltf)$/i.test(file.name))
-        return 'asset';
-    if (file.name.startsWith('.') || /\.(json|ya?ml|toml|ini|lock)$/i.test(file.name) || /^(dockerfile|makefile|go.mod|cargo.toml)$|config\./i.test(file.name))
-        return 'configuration';
-    return file.language === 'Other' ? 'other' : 'source';
+export function seed(value: string) {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++)
+        hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+    return hash >>> 0;
 }
-/** One deterministic emissive atlas. Window count is decorative, not repository data. */
-export function windowPixels() {
-    const width = 64, height = 128, data = new Uint8Array(width * height * 4);
-    for (let i = 3; i < data.length; i += 4)
-        data[i] = 255;
-    for (let row = 0; row < 7; row++)
-        for (let col = 0; col < 5; col++) {
-            if ((row * 13 + col * 7) % 11 >= 5)
-                continue;
-            for (let y = 8 + row * 16; y < 14 + row * 16; y++)
-                for (let x = 8 + col * 11; x < 12 + col * 11; x++) {
-                    const offset = (y * width + x) * 4;
-                    data[offset] = 255;
-                    data[offset + 1] = 226;
-                    data[offset + 2] = 172;
-                }
+export function architectureKind(encodedHeight: number, aggregate = false): BuildingKind {
+    if (aggregate && encodedHeight >= 16.5)
+        return 'landmark';
+    if (encodedHeight >= 8.5)
+        return 'highrise';
+    if (encodedHeight >= 4.2)
+        return 'midrise';
+    if (encodedHeight >= 1.65)
+        return 'apartment';
+    return 'townhouse';
+}
+export function buildingKind(file: FileNode) { return architectureKind(height(file.size)); }
+export function architectureVariant(id: string) { return seed(id) % 3; }
+export interface FacadePixels {
+    width: number;
+    height: number;
+    diffuse: Uint8Array;
+    emissive: Uint8Array;
+    roughness: Uint8Array;
+}
+export function facadePixels(kind: BuildingKind, variant = 0): FacadePixels {
+    const width = 64, height = 256, diffuse = new Uint8Array(width * height * 4), emissive = new Uint8Array(diffuse.length), roughness = new Uint8Array(diffuse.length);
+    const floors = { townhouse: 2, apartment: 4, midrise: 9, highrise: 20, landmark: 30 }[kind];
+    const columns = kind === 'townhouse' ? 3 : kind === 'landmark' ? 6 + variant : kind === 'highrise' ? 5 + variant : variant === 1 ? 5 : 4;
+    const glass = kind === 'highrise' || kind === 'landmark' || (kind === 'midrise' && variant === 2), brick = kind === 'townhouse' || (kind === 'apartment' && variant !== 2) || (kind === 'midrise' && variant === 0);
+    for (let y = 0; y < height; y++)
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4, fx = x / width * columns, fy = y / height * floors;
+            const window = x > 3 && x < width - 4 && y > 5 && y < height - 7 && fx % 1 > .2 && fx % 1 < .78 && fy % 1 > .2 && fy % 1 < .76;
+            const mullion = fx % 1 < .08 || fy % 1 < .08;
+            const mortar = brick && (y % 7 === 0 || (x + (Math.floor(y / 7) % 2) * 5) % 13 === 0);
+            let wall = glass ? 175 : brick ? 165 : 192;
+            if (mortar)
+                wall -= 19;
+            if (mullion)
+                wall += glass ? 30 : 5;
+            diffuse[i] = window ? (glass ? 54 : 70) : wall;
+            diffuse[i + 1] = window ? (glass ? 76 : 80) : wall;
+            diffuse[i + 2] = window ? (glass ? 91 : 86) : wall;
+            diffuse[i + 3] = 255;
+            const lit = window && ((Math.floor(fy) * 13 + Math.floor(fx) * 7 + variant * 3) % 11 < 5);
+            emissive[i] = lit ? 255 : 0;
+            emissive[i + 1] = lit ? 222 : 0;
+            emissive[i + 2] = lit ? 165 : 0;
+            emissive[i + 3] = 255;
+            const r = window ? 70 : brick ? 230 : 170;
+            roughness[i] = r;
+            roughness[i + 1] = r;
+            roughness[i + 2] = r;
+            roughness[i + 3] = 255;
         }
-    return { width, height, data };
+    // A neutral, non-emissive roof texel shared by all horizontal faces.
+    diffuse.set([150, 150, 150, 255], 0);
+    emissive.set([0, 0, 0, 255], 0);
+    roughness.set([210, 210, 210, 255], 0);
+    return { width, height, diffuse, emissive, roughness };
 }

@@ -12,7 +12,7 @@ Checked in the current environment on October 29, 2026:
 | --- | --- |
 | TypeScript strict checking | Passed |
 | ESLint | Passed without warnings |
-| Unit and mocked integration tests | 82 passed |
+| Unit and mocked integration tests | 87 passed |
 | Production build | Blocked by sandbox subprocess restrictions |
 | Playwright | Blocked because the preview server cannot bind its port |
 | Live public GitHub smoke | Attempted for Hello World, React, and TypeScript; API hostname could not resolve |
@@ -76,30 +76,48 @@ Shared URLs open the repository; they do not serialize camera position or select
 
 Tree keyboard controls: Up/Down move focus, Right expands, Left collapses or moves to the parent, Home/End move to the first/last visible row, and Enter/Space select.
 
-## Reading and navigating the map
+## Procedural city and visual encoding
 
-Colored boxes represent individual files:
+Repository buildings are the interactive data. Their facades use language colors, and their inspector always shows the real path and metadata. Environmental objects are generated separately and never contribute to file or directory statistics.
 
-- Height is `clamp(log2(1 + bytes / 256) × 1.25, 0.85, 12)`. Large files cannot grow beyond the cap; their actual size remains visible in the inspector.
-- Color is the extension-based language/category.
-- Position comes from deterministic directory packing. Directory views use local coordinates and compact aggregate spacing; Whole repository mode retains the full spatial synopsis.
+- **File height:** `clamp(log2(1 + bytes / 256) × 1.25, 0.85, 12)`.
+- **Aggregate height:** `min(22, 2.5 + log2(1 + fileCount) × 1.1)`.
+- **Aggregates:** outlined podiums distinguish them from individual files. Their language tint uses the dominant language by file count.
+- **Shape:** encoded height selects houses/townhouses, low-rise apartments, mid-rises, high-rises, or landmark skyscrapers. Large directory aggregates can become landmarks. File extension no longer chooses the architectural shape.
+- **Variation:** a stable hash of the file/group identifier selects one of three variants at each scale. The same data and settings produce the same city.
+- **Size limits:** footprints and heights remain bounded. Actual byte sizes and descendant counts remain uncapped in the inspector.
 
-Gray boxes on square bases represent aggregates:
+Geometry has normalized height, including roofs and mechanical structures, so architectural variation preserves the encoding. Shapes use merged reusable parts: setbacks, pilasters, cornices, entrances, flat or pitched roofs, mechanical boxes, and selected antennas. Facades use shared diffuse, emissive, and roughness atlases with window grids, mortar, glass panels, and floor divisions. There are no independent meshes or light objects per window.
 
-- Height is `min(22, 2.5 + log2(1 + fileCount) × 1.1)`. Directory aggregate footprints are standardized to 7×7 units; whole-repository aggregate footprints are capped at 9×9. A single oversized module cannot create an unbounded block.
-- Hover shows the represented file count.
-- Directory aggregates open their actual directory.
-- Spatial aggregates in Whole repository mode may combine files across directories; their inspector identifies them as a subset and links to their deepest common directory.
+Architecture describes visual scale, not literal meters or an inferred code role. A small repository containing a very large file can still have a tower. Landmarks appear when actual aggregate counts justify them; the renderer does not invent landmark metrics.
 
-File categories have distinct, restrained silhouettes: stepped source towers, test buildings, compact configuration towers, thin documentation slabs, asset pavilions, and general boxes. Classification uses explicit filename, path, and extension rules; it does not analyze file contents. The inspector identifies each file's building style. Every geometry has the same normalized height envelope, so shape changes do not change the file-size encoding.
+### Urban planning
 
-Warm window lights use one shared 64×128 emissive texture with mipmaps. They are subtle in light mode and more visible in dark mode. Windows are decorative and do not represent activity, lines of code, or file counts. Geometry is instanced by category, with no individual window meshes or per-building light objects.
+The visible data is projected into directory neighborhoods. Within each neighborhood, buildings occupy deterministic lots in four-by-four blocks, separated by streets. Reserved empty lots and forecourts provide parks and plazas. Shelf packing connects neighborhoods through an avenue backbone. Roads have avenue, secondary-street, and local-lane widths.
 
-Orbit by dragging, pan with right-drag, and zoom with the wheel or pinch. The visible **Pan** control makes left-drag pan instead. **Reset camera** fits the visible map. A folder click drills in and frames it; file clicks inspect and highlight without moving the camera. Tree and search selections focus the selected item.
+City density uses a continuous logarithmic file-count factor rather than a list of small/medium/large city presets. Data units retain their identity and exact counts through projection. Coordinates are local to the active view; drilling into a directory recenters its neighborhood.
 
-Focus transitions respect reduced-motion preferences. Manual camera input interrupts a transition. The map has no free-flight or cinematic modes.
+### Environment controls
 
-**Export PNG** captures the actual rendered WebGL map at 1920×1080 with letterboxing to preserve composition. The footer identifies the repository/scope, represented file count, and height encodings. HTML labels and the surrounding interface are not part of the WebGL capture. Browser export remains unverified in this environment.
+**Environment: Minimal / Detailed** changes only environmental rendering:
+
+- **Minimal:** repository architecture, district foundations, labels, and navigation.
+- **Detailed:** road surfaces, sidewalks, markings/crosswalks, parks, plazas, trees, lamps, benches, sparse background service buildings, and a repository city sign.
+- **Background buildings:** the separate checkbox hides all decorative buildings while retaining other scenery.
+
+Decorative structures use muted neutral materials, have no data labels or window lights, and cannot intercept raycasting. Environment placement is checked against repository footprints. Decorations near a selected building are suppressed, the sign hides during inspection, and selection outlines render clearly above scenery.
+
+Environmental detail is bounded: at most 128 neighborhoods receive full internal street detail, with an avenue backbone for all neighborhoods; 64 park/plaza plots, 128 trees, 96 lamps, 48 benches, and 24 background structures are supported. Available free space can produce fewer objects, including no background structures. This does not omit repository data.
+
+### Navigation and presentation
+
+The initial scene is the whole-repository overview. Select a directory or its aggregate to drill in; search or the file tree focuses a real file. Clicking a file in the canvas inspects it without moving the camera.
+
+Drag to orbit, right-drag to pan, and scroll/pinch to zoom. The visible **Pan** control changes left-drag to pan. **Reset camera** fits the active map. Focus transitions respect reduced motion and are interrupted by manual camera input.
+
+Lighting uses a hemisphere, directional sunlight, warm facade emission, and local shadows near the inspection target. Distant views reduce environmental detail and disable shadows. Sustained low frame rates reduce rendering resolution and decorative detail; idle demand-rendering gaps are excluded from frame-rate sampling. Roof silhouettes remain present at a distance so apparent height is preserved. No bloom, particles, traffic simulation, or free-flight controls are included.
+
+**Export PNG** captures actual rendered WebGL content at 1920×1080 with letterboxing. Its footer identifies the repository, represented-file count, and height encodings. HTML file/district labels and surrounding UI are not part of the WebGL capture; the physical city sign uses a canvas texture and is included if visible. Browser export and visual appearance remain unverified in this environment.
 
 ## Data definitions
 
@@ -142,34 +160,40 @@ Directory mode:
 - At most 2,000 descendant files are shown directly.
 - Larger scopes show child-directory aggregates and pages of up to 1,000 direct files.
 - Directories are paginated in groups of up to 500 when necessary.
-- The map states exactly how many files it currently represents. Paging does not remove data from the tree or search. Aggregated views use evenly spaced directory tiles, so an unusually large subtree cannot stretch its neighbors out of view.
+- The map states exactly how many files it currently represents. Paging does not remove data from the tree or search. Aggregates and files are assigned bounded lots in directory neighborhoods, so a single outlier cannot stretch a block or destroy skyline proportions.
 
 Whole repository mode:
 
 - Up to 8,000 files appear individually.
-- Larger trees use a deterministic spatial grid with at most 8,000 visible items.
+- Larger trees use a deterministic spatial grid with at most 8,000 visible items. Its effective budget decreases smoothly as file count grows, grouping more files into each representation at metropolitan scales.
 - Singleton cells retain their real file buildings; multi-file cells become explicit aggregates.
 - Every loaded file contributes to exactly one visible item. No files are sampled away.
 
-Up to 200 district foundations and 16 labels provide context. Those visual-detail limits do not reduce file counts.
+All visible neighborhoods receive instanced district foundations. Up to 16 directory labels provide context. Environmental budgets do not reduce represented file counts.
 
-File categories, aggregates, aggregate bases, and district foundations use instanced meshes. Instance matrices update when prepared views change, not every animation frame. The renderer uses demand rendering, a bounded device pixel ratio, and native mesh frustum culling. Camera transitions invalidate frames only while moving.
+The five architectural scales and three seeded variants use instanced body/roof batches; podiums, foundations, and environmental elements are also instanced. Instance matrices update when prepared views change, not every animation frame. The renderer uses demand rendering, a bounded device pixel ratio, and native mesh frustum culling. Camera transitions invalidate frames only while moving.
 
 The tree mounts only the visible rows plus overscan, with keyboard row lookup indexed independently of DOM size. The complete normalized metadata and worker copies still consume memory; support is not unlimited.
 
 ## Actual CPU measurements
 
-One synthetic run on Linux, Node v26.12.1, Intel Core i7-1165G7 @ 2.80 GHz:
+One synthetic whole-repository run on Linux, Node v26.12.1, Intel Core i7-1165G7 @ 2.80 GHz:
 
-| Files | Preparation | Root map | Path search | Flatten fully expanded tree |
-| ---: | ---: | ---: | ---: | ---: |
-| 5,000 | 12.13 ms | 0.40 ms | 0.48 ms | 0.78 ms |
-| 25,000 | 67.72 ms | 0.07 ms | 1.77 ms | 1.52 ms |
-| 100,000 | 259.27 ms | 0.06 ms | 8.12 ms | 5.70 ms |
+| Files represented | Preparation | Urban layout | Environment placement | Repository units | Roads | Trees | Background structures |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 5,000 | 11.18 ms | 7.11 ms | 7.81 ms | 5,000 | 614 | 81 | 0 |
+| 25,000 | 64.08 ms | 3.10 ms | 6.65 ms | 2,906 | 614 | 128 | 24 |
+| 100,000 | 247.53 ms | 2.44 ms | 7.04 ms | 1,410 | 425 | 128 | 24 |
 
-Preparation includes indexing, layout, lookup maps, and the whole-repository synopsis. Input normalization happens before timing. The fixture contains a src directory with 100 child directories; its root map has one aggregate.
+The 100,000-file fixture produces 1,247 high-rise and 163 mid-rise representations, accounting for all 100,000 files exactly once. The fixture uses a src directory with 100 child directories and progressively increasing file sizes. This is synthetic data, not a benchmark of React or TypeScript repositories.
 
-These single-run CPU measurements exclude networking, worker structured cloning, React row-position indexing, DOM rendering, shader compilation, picking, and GPU work. They are not navigation FPS guarantees. Use `npm run benchmark` to reproduce and profile representative real repositories separately.
+Reproduce with:
+
+```sh
+node node_modules/vite-node/vite-node.mjs scripts/benchmark-city.ts
+```
+
+The timings exclude networking, normalization, worker cloning, React, texture upload, shader compilation, picking, and GPU work. They are not FPS guarantees. The existing `npm run benchmark` also measures directory search/index preparation. Real-browser GPU profiling remains required.
 
 ## Structure
 
@@ -185,19 +209,22 @@ components/
   Search.tsx               Search and command-style keyboard access
   MapPanel.tsx             Map controls, fallback, and paging
   City.tsx                 Instancing, picking, camera, and PNG capture
-  building-geometry.ts      Shared silhouettes and window texture
+  building-geometry.ts      Modular scale-based architecture and facade atlases
+  Environment.tsx          Batched scenery and physical city sign
   ThemeToggle.tsx          Light/dark/system preferences
 hooks/
   useRepository.ts         Cancellable loading and worker lifecycle
 lib/
   github.ts                Validated GitHub retrieval and traversal
   model.ts                 URL parsing, normalization, language detection
-  building-style.ts        Filename categories, footprints, and window pixels
+  building-style.ts        Height-based archetypes, seeded variants, facade pixels
+  urban-layout.ts          District lots, blocks, roads, and reserved spaces
+  environment.ts           Collision-checked secondary-object placement
   explorer.ts              Directory index, search, statistics, tree rows
   navigation.ts            Pure typed navigation reducer
   layout.ts                Pure deterministic layout
   whole-city.ts            Complete bounded spatial synopsis
-  map-view.ts              Directory and whole-map projection
+  map-view.ts              Accurate data projection into the urban planner
   prepare.ts               Shared preparation pipeline
   layout.worker.ts         Worker entry point
 tests/                     Unit/integration and mocked Playwright coverage
@@ -209,13 +236,14 @@ A single reducer owns selection and navigation; the tree, inspector, and canvas 
 ## Remaining verification and limitations
 
 - Production build, browser journeys, visual inspection, and real PNG pixels must be verified outside this sandbox.
-- No verified screenshots or deployment are included. Use Export PNG from a running application before adding a reference screenshot.
+- No verified screenshots or deployment are included. The Manhattan-inspired visual result has not been inspected in a browser. Use Export PNG from a running application before adding a reference screenshot.
 - Real-repository smoke attempts were blocked by DNS, so current performance measurements use synthetic trees.
 - Search displays up to 60 results; folder navigation remains exhaustive.
 - Full metadata and worker cloning can exhaust memory for exceptionally large trees.
 - Individual tree truncation and GitHub rate/request/time budgets can prevent complete retrieval.
 - Language classification is deliberately extension-based.
-- Camera and accessibility behavior have unit coverage and authored browser tests, but need real-device validation.
+- Camera, material appearance, shadows, environment toggles, and accessibility need real-device validation. Browser journeys are authored but blocked here.
+- Rendering is instanced but does not yet use chunked spatial picking or a full traffic/road simulation. Streets are a lightweight planned network, not geographic navigation data.
 
 ## Contributing and license
 

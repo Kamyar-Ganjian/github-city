@@ -23,7 +23,7 @@ function Workspace({ loaded, onMessage }: {
     onMessage: (message: string) => void;
 }) {
     const { repository, prepared } = loaded;
-    const [navigation, dispatch] = useReducer(navigate, initialNavigation);
+    const [navigation, dispatch] = useReducer(navigate, initialNavigation, initial => navigate(initial, { type: 'whole' }));
     const [treeOpen, setTreeOpen] = useState(true), [panel, setPanel] = useState('files');
     const root = prepared.index.directories.get('/')!;
     const onSelect = useCallback((item: ExplorerItem, focus = true) => {
@@ -39,13 +39,15 @@ function Workspace({ loaded, onMessage }: {
     }, [prepared]);
     const selected = navigation.selection.kind === 'group' ? { kind: 'directory' as const, path: navigation.selection.block.directory } : navigation.selection;
     const parts = navigation.directory === '/' ? [] : navigation.directory.split('/');
-    async function share() { try {
-        await navigator.clipboard.writeText(window.location.href);
-        onMessage('Repository link copied.');
+    async function share() {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            onMessage('Repository link copied.');
+        }
+        catch {
+            onMessage('Copy the current page URL to share this repository.');
+        }
     }
-    catch {
-        onMessage('Copy the current page URL to share this repository.');
-    } }
     return <div className="workspace-shell">
   <div className="workspace-bar"><div className="workspace-location"><button className="icon-button tree-toggle" aria-expanded={treeOpen} aria-label={treeOpen ? 'Hide file tree' : 'Show file tree'} onClick={() => setTreeOpen(v => !v)}>☷</button><nav className="breadcrumbs" aria-label="Repository path"><button onClick={() => onSelect({ kind: 'directory', path: '/' })}>{repository.owner} / <strong>{repository.name}</strong></button>{parts.map((part, i) => <span key={i}><span aria-hidden="true">/</span><button onClick={() => onSelect({ kind: 'directory', path: parts.slice(0, i + 1).join('/') })}>{part}</button></span>)}</nav></div><Search index={prepared.index} onSelect={onSelect}/><button className="share-button" onClick={() => void share()}>Share ↗</button></div>
   <div className="repository-stats"><span className="branch-badge">⑂ {repository.branch}</span><span>{root.fileCount.toLocaleString()} files</span><span>{root.directoryCount.toLocaleString()} directories</span><span title="Sum of available GitHub blob sizes">{formatBytes(root.bytes)} in file metadata</span><span title="Number of nested directories on the deepest path">Depth {prepared.index.maxDepth}</span>{repository.submodules?.length ? <span className="submodule-note">{repository.submodules.length} external submodules excluded</span> : null}</div>

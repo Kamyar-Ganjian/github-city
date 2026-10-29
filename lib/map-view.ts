@@ -1,9 +1,10 @@
+import { urbanLayout, UrbanPlan } from './urban-layout';
 import { Building, District } from './layout';
 import { aggregateHeight, DETAIL_LIMIT, DIRECTORY_PAGE_SIZE, FILE_PAGE_SIZE } from './explorer';
 import { Navigation } from './navigation';
 import { PreparedRepository } from './prepare';
 import { CityBlock } from './whole-city';
-export interface MapView {
+interface MapContent {
     bounds: District;
     maxHeight: number;
     buildings: Building[];
@@ -32,14 +33,14 @@ function frame(fallback: District, files: Building[], aggregates: CityBlock[]) {
     return { bounds: Number.isFinite(minX) ? { ...fallback, x: (minX + maxX) / 2, z: (minZ + maxZ) / 2, width: Math.max(8, maxX - minX + 4), depth: Math.max(8, maxZ - minZ + 4) } : fallback, maxHeight };
 }
 /** Local view coordinates keep drill-downs centered instead of flying across empty world space. */
-function localize(view: MapView): MapView {
+function localize(view: MapContent): MapContent {
     const { x, z } = view.bounds;
     return { ...view, bounds: { ...view.bounds, x: 0, z: 0 },
         buildings: view.buildings.map(b => ({ ...b, x: b.x - x, z: b.z - z })),
         aggregates: view.aggregates.map(b => ({ ...b, x: b.x - x, z: b.z - z })),
         boundaries: view.boundaries.map(d => ({ ...d, x: d.x - x, z: d.z - z })) };
 }
-export function mapView(prepared: PreparedRepository, navigation: Pick<Navigation, 'directory' | 'mode' | 'filePage' | 'directoryPage'>): MapView {
+function repositoryView(prepared: PreparedRepository, navigation: Pick<Navigation, 'directory' | 'mode' | 'filePage' | 'directoryPage'>): MapContent {
     const { index, city, whole, buildings, districts } = prepared, path = navigation.mode === 'whole' ? '/' : navigation.directory;
     const directory = index.directories.get(path)!;
     const bounds = districts.get(path) ?? city.districts[0];
@@ -87,4 +88,12 @@ export function mapView(prepared: PreparedRepository, navigation: Pick<Navigatio
                 break;
         }
     return localize({ ...frame(bounds, visibleFiles, aggregates), buildings: visibleFiles, aggregates, boundaries: boundaryPaths.map(p => districts.get(p)!), representedFiles: visibleFiles.length + aggregates.reduce((sum, a) => sum + a.count, 0), filePages: detailed ? 1 : Math.max(1, Math.ceil(directory.files.length / FILE_PAGE_SIZE)), directoryPages: detailed ? 1 : Math.max(1, Math.ceil(directory.directories.length / DIRECTORY_PAGE_SIZE)) });
+}
+export interface MapView extends MapContent {
+    urban: UrbanPlan;
+}
+export function mapView(prepared: PreparedRepository, navigation: Pick<Navigation, 'directory' | 'mode' | 'filePage' | 'directoryPage'>): MapView {
+    const raw = repositoryView(prepared, navigation);
+    const urban = urbanLayout(raw.buildings, raw.aggregates, raw.representedFiles);
+    return { ...raw, urban, buildings: urban.buildings, aggregates: urban.aggregates, boundaries: urban.districts.slice(0, 200), bounds: { ...raw.bounds, ...urban.bounds } };
 }
